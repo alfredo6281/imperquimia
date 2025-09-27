@@ -5,6 +5,7 @@ import { InventoryDashboard } from "./components/inventory-dashboard";
 import { AddProduct } from "./components/add-product";
 import { InventoryMovements } from "./components/inventory-movements";
 import { Reports } from "./components/reports";
+
 export default function App() {
   const [activeView, setActiveView] = useState("inventory");
 
@@ -33,5 +34,3 @@ export default function App() {
     </div>
   );
 }
-
-//export default App

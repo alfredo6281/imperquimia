@@ -1,13 +1,14 @@
-import { useState, useEffect, useRef } from "react";
-import { Plus, Package, TrendingDown, Eye } from "lucide-react";
+import { useState, useRef, useEffect } from "react";
+import { Plus, Package, TrendingDown, Eye, Edit } from "lucide-react";
 import { Button } from "./ui/button";
 import { Input } from "./ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "./ui/table";
 import { Badge } from "./ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "./ui/card";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "./ui/dialog";
-import { ImageWithFallback } from "./figma/ImageWithFallback";
+import { ScrollArea } from "./ui/scroll-area";
 import { Pagination, PaginationContent, PaginationEllipsis, PaginationItem, PaginationLink, PaginationNext, PaginationPrevious } from "./ui/pagination";
+import { ImageWithFallback } from "./figma/ImageWithFallback";
 import axios from "axios";
 
 interface Product {
@@ -21,7 +22,6 @@ interface Product {
   idCategoria: number;
   URLImagen: string;
 }
-
 const Categoria=['Acrilico','Prefabricado', 'Elastomerico', 'Sellador', 'Primer', 'Fibrado','Cemento'];
 interface InventoryDashboardProps {
   onViewChange: (view: string) => void;
@@ -32,8 +32,9 @@ export function InventoryDashboard({ onViewChange }: InventoryDashboardProps) {
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
   const [isViewModalOpen, setIsViewModalOpen] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
-  const [itemsPerPage] = useState(10);
+  const [itemsPerPage] = useState(4);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
   // Datos mock del inventario
   const [products, setProducts] = useState<Product[]>([]);
 
@@ -48,9 +49,12 @@ export function InventoryDashboard({ onViewChange }: InventoryDashboardProps) {
 }, []);
 
   const filteredProducts = products.filter(product =>
-    product.nombre.toLowerCase().includes(searchTerm.toLowerCase())
-    
+    product.nombre.toLowerCase().includes(searchTerm.toLowerCase()) 
+    //||
+    //product.categoria.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    //product.proveedor.toLowerCase().includes(searchTerm.toLowerCase())
   );
+
   // Cálculos para paginación
   const totalPages = Math.ceil(filteredProducts.length / itemsPerPage);
   const startIndex = (currentPage - 1) * itemsPerPage;
@@ -62,6 +66,7 @@ export function InventoryDashboard({ onViewChange }: InventoryDashboardProps) {
     setSearchTerm(value);
     setCurrentPage(1);
   };
+
   const lowStockProducts = products.filter(product => product.Stock <= product.stockMinimo);
   const totalProducts = products.length;
   const totalValue = products.reduce((sum, product) => sum + (product.Stock * product.PrecioUnitario), 0);
@@ -76,6 +81,23 @@ export function InventoryDashboard({ onViewChange }: InventoryDashboardProps) {
   const handleViewProduct = (product: Product) => {
     setSelectedProduct(product);
     setIsViewModalOpen(true);
+  };
+
+  const handleEditImage = () => {
+    fileInputRef.current?.click();
+  };
+
+  const handleImageChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (file && selectedProduct) {
+      const imageUrl = URL.createObjectURL(file);
+      // En un sistema real, aquí subirías la imagen al servidor
+      // Por ahora, solo actualizamos la URL localmente
+      setSelectedProduct({
+        ...selectedProduct,
+        imageUrl: imageUrl
+      });
+    }
   };
 
   return (
@@ -149,7 +171,7 @@ export function InventoryDashboard({ onViewChange }: InventoryDashboardProps) {
         <Input
           placeholder="Buscar productos..."
           value={searchTerm}
-          onChange={(e) => setSearchTerm(e.target.value)}
+          onChange={(e) => handleSearchChange(e.target.value)}
           className="md:w-80 rounded-lg border-slate-300"
         />
       </div>
@@ -163,47 +185,49 @@ export function InventoryDashboard({ onViewChange }: InventoryDashboardProps) {
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <Table>
-            <TableHeader>
-              <TableRow className="border-slate-200">
-                <TableHead className="text-slate-700 font-bold table-color">Nombre del Producto</TableHead>
-                <TableHead className="text-slate-700 font-bold table-color">Categoría</TableHead>
-                <TableHead className="text-slate-700 font-bold table-color">Stock Actual</TableHead>
-                <TableHead className="text-slate-700 font-bold table-color">Stock Mínimo</TableHead>
-                <TableHead className="text-slate-700 font-bold table-color">Precio Unitario</TableHead>
-                <TableHead className="text-slate-700 font-bold table-color">Proveedor</TableHead>
-                <TableHead className="text-slate-700 font-bold table-color">Estado</TableHead>
-                <TableHead className="text-slate-700 font-bold table-color">Acciones</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {filteredProducts.map((product) => (
-                <TableRow key={product.idProducto} className="border-slate-200 hover:bg-slate-50">
-                  <TableCell className="font-medium text-slate-800">{product.nombre}</TableCell>
-                  <TableCell className="text-slate-600">{product.idCategoria}</TableCell>
-                  <TableCell className={`font-medium ${product.Stock <= product.stockMinimo ? 'text-red-600' : 'text-slate-800'}`}>
-                    {product.Stock}
-                  </TableCell>
-                  <TableCell className="text-slate-600">{product.stockMinimo}</TableCell>
-                  <TableCell className="text-slate-800">${product.PrecioUnitario}</TableCell>
-                  <TableCell className="text-slate-600">{product.idProveedor}</TableCell>
-                  <TableCell>{getStockStatus(product.Stock, product.stockMinimo)}</TableCell>
-                  <TableCell>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => handleViewProduct(product)}
-                      className="h-8 w-8 p-0 text-slate-600 hover:text-blue-600 hover:bg-blue-50"
-                    >
-                      <Eye className="h-4 w-4" />
-                    </Button>
-                  </TableCell>
+          <ScrollArea className="h-[500px] w-full">
+            <Table>
+              <TableHeader>
+                <TableRow className="border-slate-200">
+                  <TableHead className="text-slate-700 font-bold table-color">Nombre del Producto</TableHead>
+                  <TableHead className="text-slate-700 font-bold table-color">Categoría</TableHead>
+                  <TableHead className="text-slate-700 font-bold table-color">Stock Actual</TableHead>
+                  <TableHead className="text-slate-700 font-bold table-color">Stock Mínimo</TableHead>
+                  <TableHead className="text-slate-700 font-bold table-color">Precio Unitario</TableHead>
+                  <TableHead className="text-slate-700 font-bold table-color">Proveedor</TableHead>
+                  <TableHead className="text-slate-700 font-bold table-color">Estado</TableHead>
+                  <TableHead className="text-slate-700 font-bold table-color">Acciones</TableHead>
                 </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        
-        {/* Información de paginación y controles */}
+              </TableHeader>
+              <TableBody>
+                {currentProducts.map((product) => (
+                  <TableRow key={product.idProducto} className="border-slate-200 hover:bg-slate-50">
+                    <TableCell className="font-medium text-slate-800">{product.nombre}</TableCell>
+                    <TableCell className="text-slate-600">{product.idCategoria}</TableCell>
+                    <TableCell className={`font-medium ${product.Stock <= product.stockMinimo ? 'text-red-600' : 'text-slate-800'}`}>
+                      {product.Stock}
+                    </TableCell>
+                    <TableCell className="text-slate-600">{product.stockMinimo}</TableCell>
+                    <TableCell className="text-slate-800">${product.PrecioUnitario}</TableCell>
+                    <TableCell className="text-slate-600">{product.idProveedor}</TableCell>
+                    <TableCell>{getStockStatus(product.Stock, product.stockMinimo)}</TableCell>
+                    <TableCell>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => handleViewProduct(product)}
+                        className="h-8 w-8 p-0 text-slate-600 hover:text-blue-600 hover:bg-blue-50"
+                      >
+                        <Eye className="h-4 w-4" />
+                      </Button>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </ScrollArea>
+          
+          {/* Información de paginación y controles */}
           {totalPages > 1 && (
             <div className="flex items-center justify-between space-x-2 py-4">
               <div className="text-sm text-slate-600">
@@ -261,8 +285,7 @@ export function InventoryDashboard({ onViewChange }: InventoryDashboardProps) {
           )}
         </CardContent>
       </Card>
- 
-              
+
       {/* Modal de visualización de producto */}
       <Dialog open={isViewModalOpen} onOpenChange={setIsViewModalOpen}>
         <DialogContent className="max-w-6xl w-[95vw] max-h-[90vh] overflow-y-auto anchura_ventana">
@@ -277,12 +300,28 @@ export function InventoryDashboard({ onViewChange }: InventoryDashboardProps) {
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-4">
               {/* Imagen del producto */}
               <div className="space-y-4">
-                <div className="aspect-square rounded-lg overflow-hidden bg-slate-100 border border-slate-200">
+                <div className="relative aspect-square rounded-lg overflow-hidden bg-slate-100 border border-slate-200">
                   <ImageWithFallback
                     //src={selectedProduct.URLImagen}
                     src="./src/img/Productos/Prueba.webp"
                     alt={selectedProduct.nombre}
                     className="w-full h-full object-cover"
+                  />
+                  {/* Botón de editar imagen */}
+                  <button
+                    onClick={handleEditImage}
+                    className="absolute top-2 right-2 bg-white bg-opacity-90 hover:bg-opacity-100 rounded-full p-2 shadow-md transition-all duration-200 hover:scale-105"
+                    title="Editar imagen"
+                  >
+                    <Edit className="h-4 w-4 text-slate-600" />
+                  </button>
+                  {/* Input de archivo oculto */}
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    accept="image/*"
+                    onChange={handleImageChange}
+                    className="hidden"
                   />
                 </div>
                 
@@ -309,7 +348,7 @@ export function InventoryDashboard({ onViewChange }: InventoryDashboardProps) {
                   <h3 className="text-lg font-semibold text-slate-800 mb-2">{selectedProduct.nombre}</h3>
                   <Badge variant="secondary" className="mb-4">{selectedProduct.idCategoria}</Badge>
                   <p className="text-slate-600 leading-relaxed">
-                    
+                    {/*selectedProduct.description*/}
                   </p>
                 </div>
 

@@ -1,4 +1,4 @@
-import { Package, ArrowDownToLine, ArrowUpFromLine, FileBarChart } from "lucide-react";
+import { Package, ArrowDownToLine, ArrowUpFromLine, FileBarChart, History } from "lucide-react";
 import { Button } from "./ui/button";
 
 interface SidebarProps {
@@ -11,6 +11,7 @@ export function Sidebar({ activeView, onViewChange }: SidebarProps) {
     { id: 'inventory', label: 'Inventario', icon: Package },
     { id: 'entries', label: 'Entradas', icon: ArrowDownToLine },
     { id: 'exits', label: 'Salidas', icon: ArrowUpFromLine },
+    { id: 'history', label: 'Historial', icon: History },
     { id: 'reports', label: 'Reportes', icon: FileBarChart },
   ];
 

@@ -4,6 +4,7 @@ import { Sidebar } from "./components/sidebar";
 import { InventoryDashboard } from "./components/inventory-dashboard";
 import { AddProduct } from "./components/add-product";
 import { InventoryMovements } from "./components/inventory-movements";
+import { MovementHistory } from "./components/movement-history";
 import { Reports } from "./components/reports";
 
 export default function App() {
@@ -19,6 +20,8 @@ export default function App() {
         return <InventoryMovements onViewChange={setActiveView} movementType="entries" />;
       case 'exits':
         return <InventoryMovements onViewChange={setActiveView} movementType="exits" />;
+      case 'history':
+        return <MovementHistory onViewChange={setActiveView} />;
       case 'reports':
         return <Reports onViewChange={setActiveView} />;
       default:

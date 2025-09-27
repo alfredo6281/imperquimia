@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from "react";
-import { Plus, Package, TrendingDown, Eye, Edit } from "lucide-react";
+import { Plus, Package, TrendingDown, Eye, Edit, History } from "lucide-react";
 import { Button } from "./ui/button";
 import { Input } from "./ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "./ui/table";
@@ -50,8 +50,8 @@ export function InventoryDashboard({ onViewChange }: InventoryDashboardProps) {
 
   const filteredProducts = products.filter(product =>
     product.nombre.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    product.categoria.toLowerCase().includes(searchTerm.toLowerCase()) 
-    //|| product.proveedor.toLowerCase().includes(searchTerm.toLowerCase())
+    product.categoria.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    product.proveedor.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
   // Cálculos para paginación
@@ -165,6 +165,14 @@ export function InventoryDashboard({ onViewChange }: InventoryDashboardProps) {
             className="border-slate-300 text-slate-700 hover:bg-slate-50 rounded-lg"
           >
             Registrar Salida
+          </Button>
+          <Button 
+            variant="outline" 
+            onClick={() => onViewChange('history')}
+            className="border-slate-300 text-slate-700 hover:bg-slate-50 rounded-lg"
+          >
+            <History className="h-4 w-4 mr-2" />
+            Ver Historial
           </Button>
         </div>
         <Input
@@ -357,7 +365,7 @@ export function InventoryDashboard({ onViewChange }: InventoryDashboardProps) {
                   <div className="grid grid-cols-1 gap-3">
                     <div className="flex justify-between items-center py-2 border-b border-slate-100">
                       <span className="text-slate-600">SKU:</span>
-                      <span className="font-medium text-slate-800">{selectedProduct.PrecioUnitario}</span>
+                      <span className="font-medium text-slate-800">{selectedProduct.idProducto}</span>
                     </div>
                     <div className="flex justify-between items-center py-2 border-b border-slate-100">
                       <span className="text-slate-600">Peso:</span>
@@ -420,6 +428,7 @@ export function InventoryDashboard({ onViewChange }: InventoryDashboardProps) {
                   >
                     Registrar Salida
                   </Button>
+                  
                 </div>
               </div>
             </div>

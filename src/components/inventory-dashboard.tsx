@@ -308,7 +308,7 @@ export function InventoryDashboard({ onViewChange }: InventoryDashboardProps) {
                   {/* Botón de editar imagen */}
                   <button
                     onClick={handleEditImage}
-                    className="absolute top-2 right-2 z-20 bg-white bg-opacity-90 hover:bg-opacity-100 rounded-full p-2 shadow-md transition-all duration-200 hover:scale-105"
+                    className="absolute top-2 right-2 bg-white bg-opacity-90 hover:bg-opacity-100 rounded-full p-2 shadow-md transition-all duration-200 hover:scale-105"
                     title="Editar imagen"
                   >
                     <Edit className="h-4 w-4 text-slate-600" />

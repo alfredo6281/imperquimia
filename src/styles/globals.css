@@ -1331,6 +1331,10 @@
     text-underline-offset: 4px;
   }
 
+  .z-20{
+    z-index: 50;
+  }
+
   .opacity-50 {
     opacity: .5;
   }

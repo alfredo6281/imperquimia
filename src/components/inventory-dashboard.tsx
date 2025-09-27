@@ -17,12 +17,12 @@ interface Product {
   PrecioUnitario: number;
   Stock: number;
   stockMinimo: number;
-  idUnidadMedida: number;
-  idProveedor: number;
-  idCategoria: number;
+  unidadMedida: string;
+  proveedor: string;
+  categoria: string;
   URLImagen: string;
 }
-const Categoria=['Acrilico','Prefabricado', 'Elastomerico', 'Sellador', 'Primer', 'Fibrado','Cemento'];
+
 interface InventoryDashboardProps {
   onViewChange: (view: string) => void;
 }
@@ -49,10 +49,9 @@ export function InventoryDashboard({ onViewChange }: InventoryDashboardProps) {
 }, []);
 
   const filteredProducts = products.filter(product =>
-    product.nombre.toLowerCase().includes(searchTerm.toLowerCase()) 
-    //||
-    //product.categoria.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    //product.proveedor.toLowerCase().includes(searchTerm.toLowerCase())
+    product.nombre.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    product.categoria.toLowerCase().includes(searchTerm.toLowerCase()) 
+    //|| product.proveedor.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
   // Cálculos para paginación
@@ -95,7 +94,7 @@ export function InventoryDashboard({ onViewChange }: InventoryDashboardProps) {
       // Por ahora, solo actualizamos la URL localmente
       setSelectedProduct({
         ...selectedProduct,
-        imageUrl: imageUrl
+        URLImagen: imageUrl
       });
     }
   };
@@ -203,13 +202,13 @@ export function InventoryDashboard({ onViewChange }: InventoryDashboardProps) {
                 {currentProducts.map((product) => (
                   <TableRow key={product.idProducto} className="border-slate-200 hover:bg-slate-50">
                     <TableCell className="font-medium text-slate-800">{product.nombre}</TableCell>
-                    <TableCell className="text-slate-600">{product.idCategoria}</TableCell>
+                    <TableCell className="text-slate-600">{product.categoria}</TableCell>
                     <TableCell className={`font-medium ${product.Stock <= product.stockMinimo ? 'text-red-600' : 'text-slate-800'}`}>
                       {product.Stock}
                     </TableCell>
                     <TableCell className="text-slate-600">{product.stockMinimo}</TableCell>
                     <TableCell className="text-slate-800">${product.PrecioUnitario}</TableCell>
-                    <TableCell className="text-slate-600">{product.idProveedor}</TableCell>
+                    <TableCell className="text-slate-600">{product.proveedor}</TableCell>
                     <TableCell>{getStockStatus(product.Stock, product.stockMinimo)}</TableCell>
                     <TableCell>
                       <Button
@@ -302,26 +301,26 @@ export function InventoryDashboard({ onViewChange }: InventoryDashboardProps) {
               <div className="space-y-4">
                 <div className="relative aspect-square rounded-lg overflow-hidden bg-slate-100 border border-slate-200">
                   <ImageWithFallback
-                    //src={selectedProduct.URLImagen}
-                    src="./src/img/Productos/Prueba.webp"
+                    src={selectedProduct.URLImagen?.trim() || "./src/img/no_image.webp"}
                     alt={selectedProduct.nombre}
                     className="w-full h-full object-cover"
                   />
                   {/* Botón de editar imagen */}
                   <button
                     onClick={handleEditImage}
-                    className="absolute top-2 right-2 bg-white bg-opacity-90 hover:bg-opacity-100 rounded-full p-2 shadow-md transition-all duration-200 hover:scale-105"
+                    className="absolute top-2 right-2 z-20 bg-white bg-opacity-90 hover:bg-opacity-100 rounded-full p-2 shadow-md transition-all duration-200 hover:scale-105"
                     title="Editar imagen"
                   >
                     <Edit className="h-4 w-4 text-slate-600" />
                   </button>
+
                   {/* Input de archivo oculto */}
                   <input
                     ref={fileInputRef}
                     type="file"
                     accept="image/*"
                     onChange={handleImageChange}
-                    className="hidden"
+                    className=""
                   />
                 </div>
                 
@@ -346,7 +345,7 @@ export function InventoryDashboard({ onViewChange }: InventoryDashboardProps) {
               <div className="space-y-6">
                 <div>
                   <h3 className="text-lg font-semibold text-slate-800 mb-2">{selectedProduct.nombre}</h3>
-                  <Badge variant="secondary" className="mb-4">{selectedProduct.idCategoria}</Badge>
+                  <Badge variant="secondary" className="mb-4">{selectedProduct.categoria}</Badge>
                   <p className="text-slate-600 leading-relaxed">
                     {/*selectedProduct.description*/}
                   </p>
@@ -370,7 +369,7 @@ export function InventoryDashboard({ onViewChange }: InventoryDashboardProps) {
                     </div>
                     <div className="flex justify-between items-center py-2 border-b border-slate-100">
                       <span className="text-slate-600">Proveedor:</span>
-                      <span className="font-medium text-slate-800">{selectedProduct.idProveedor}</span>
+                      <span className="font-medium text-slate-800">{selectedProduct.proveedor}</span>
                     </div>
                     <div className="flex justify-between items-center py-2 border-b border-slate-100">
                       <span className="text-slate-600">Fecha de ingreso:</span>

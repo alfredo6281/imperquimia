@@ -13,15 +13,15 @@ interface AddProductProps {
 
 export function AddProduct({ onViewChange }: AddProductProps) {
   const [formData, setFormData] = useState({
-    name: "",
-    category: "",
-    unitMeasure: "",
-    initialStock: "",
-    unitPrice: "",
-    supplier: ""
+    nombre: "",
+    categoria: "",
+    unidaMedida: "",
+    Stock: "",
+    precioUnitario: "",
+    proveedor: ""
   });
 
-  const categories = [
+  const categorias = [
     "Acrílico",
     "Prefabricado", 
     "Elastomérico",
@@ -31,7 +31,7 @@ export function AddProduct({ onViewChange }: AddProductProps) {
     "Cemento"
   ];
 
-  const unitMeasures = [
+  const unidadesMedida = [
     "Litros",
     "Kilogramos", 
     "Metros",
@@ -40,7 +40,7 @@ export function AddProduct({ onViewChange }: AddProductProps) {
     "Galones"
   ];
 
-  const suppliers = [
+  const proveedores = [
     "Distribuidora ABC",
     "Impertech S.A.",
     "QuímicosXYZ",
@@ -55,33 +55,58 @@ export function AddProduct({ onViewChange }: AddProductProps) {
     }));
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
-    // Validación básica
-    if (!formData.name || !formData.category || !formData.unitMeasure || 
-        !formData.initialStock || !formData.unitPrice || !formData.supplier) {
+
+    if (
+      !formData.nombre || 
+      !formData.categoria || 
+      !formData.unidaMedida || 
+      !formData.Stock || 
+      !formData.precioUnitario || 
+      !formData.proveedor
+    ) {
       toast.error("Por favor, completa todos los campos");
       return;
     }
 
-    // Simular guardado del producto
-    toast.success("Producto agregado exitosamente");
-    
-    // Limpiar formulario
-    setFormData({
-      name: "",
-      category: "",
-      unitMeasure: "",
-      initialStock: "",
-      unitPrice: "",
-      supplier: ""
-    });
+    try {
+      const response = await fetch("http://localhost:5000/producto", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          nombre: formData.nombre,
+          categoria: formData.categoria,
+          unidadMedida: formData.unidaMedida,
+          Stock: parseInt(formData.Stock, 10),
+          precioUnitario: parseFloat(formData.precioUnitario),
+          proveedor: formData.proveedor
+        })
+      });
 
-    // Regresar al inventario después de 1 segundo
-    setTimeout(() => {
-      onViewChange('inventory');
-    }, 1000);
+      if (!response.ok) {
+        throw new Error("Error al guardar el producto");
+      }
+
+      toast.success("Producto agregado exitosamente");
+
+      // Limpiar formulario
+      setFormData({
+        nombre: "",
+        categoria: "",
+        unidaMedida: "",
+        Stock: "",
+        precioUnitario: "",
+        proveedor: ""
+      });
+
+      setTimeout(() => {
+        onViewChange("inventory");
+      }, 1000);
+    } catch (error) {
+      console.error(error);
+      toast.error("Hubo un problema al guardar el producto");
+    }
   };
 
   return (
@@ -115,23 +140,23 @@ export function AddProduct({ onViewChange }: AddProductProps) {
                 <Label htmlFor="name" className="text-slate-700">Nombre del Producto</Label>
                 <Input
                   id="name"
-                  value={formData.name}
-                  onChange={(e) => handleInputChange('name', e.target.value)}
+                  value={formData.nombre}
+                  onChange={(e) => handleInputChange('nombre', e.target.value)}
                   placeholder="Ej: Impermeabilizante Acrílico Premium"
                   className="rounded-lg border-slate-300"
                 />
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="category" className="text-slate-700">Categoría</Label>
-                <Select value={formData.category} onValueChange={(value) => handleInputChange('category', value)}>
+                <Label htmlFor="categoria" className="text-slate-700">Categoría</Label>
+                <Select value={formData.categoria} onValueChange={(value) => handleInputChange('categoria', value)}>
                   <SelectTrigger className="rounded-lg border-slate-300">
                     <SelectValue placeholder="Selecciona categoría" />
                   </SelectTrigger>
                   <SelectContent>
-                    {categories.map((category) => (
-                      <SelectItem key={category} value={category}>
-                        {category}
+                    {categorias.map((categoria) => (
+                      <SelectItem key={categoria} value={categoria}>
+                        {categoria}
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -140,12 +165,12 @@ export function AddProduct({ onViewChange }: AddProductProps) {
 
               <div className="space-y-2">
                 <Label htmlFor="unitMeasure" className="text-slate-700">Unidad de Medida</Label>
-                <Select value={formData.unitMeasure} onValueChange={(value) => handleInputChange('unitMeasure', value)}>
+                <Select value={formData.unidaMedida} onValueChange={(value) => handleInputChange('unidaMedida', value)}>
                   <SelectTrigger className="rounded-lg border-slate-300">
                     <SelectValue placeholder="Selecciona unidad" />
                   </SelectTrigger>
                   <SelectContent>
-                    {unitMeasures.map((unit) => (
+                    {unidadesMedida.map((unit) => (
                       <SelectItem key={unit} value={unit}>
                         {unit}
                       </SelectItem>
@@ -159,8 +184,8 @@ export function AddProduct({ onViewChange }: AddProductProps) {
                 <Input
                   id="initialStock"
                   type="number"
-                  value={formData.initialStock}
-                  onChange={(e) => handleInputChange('initialStock', e.target.value)}
+                  value={formData.Stock}
+                  onChange={(e) => handleInputChange('Stock', e.target.value)}
                   placeholder="Ej: 50"
                   min="0"
                   className="rounded-lg border-slate-300"
@@ -173,8 +198,8 @@ export function AddProduct({ onViewChange }: AddProductProps) {
                   id="unitPrice"
                   type="number"
                   step="0.01"
-                  value={formData.unitPrice}
-                  onChange={(e) => handleInputChange('unitPrice', e.target.value)}
+                  value={formData.precioUnitario}
+                  onChange={(e) => handleInputChange('precioUnitario', e.target.value)}
                   placeholder="Ej: 45.99"
                   min="0"
                   className="rounded-lg border-slate-300"
@@ -183,12 +208,12 @@ export function AddProduct({ onViewChange }: AddProductProps) {
 
               <div className="space-y-2">
                 <Label htmlFor="supplier" className="text-slate-700">Proveedor</Label>
-                <Select value={formData.supplier} onValueChange={(value) => handleInputChange('supplier', value)}>
+                <Select value={formData.proveedor} onValueChange={(value) => handleInputChange('proveedor', value)}>
                   <SelectTrigger className="rounded-lg border-slate-300">
                     <SelectValue placeholder="Selecciona proveedor" />
                   </SelectTrigger>
                   <SelectContent>
-                    {suppliers.map((supplier) => (
+                    {proveedores.map((supplier) => (
                       <SelectItem key={supplier} value={supplier}>
                         {supplier}
                       </SelectItem>

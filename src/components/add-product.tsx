@@ -7,6 +7,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from ".
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "./ui/card";
 import { toast } from "sonner";
 
+
 interface AddProductProps {
   onViewChange: (view: string) => void;
 }
@@ -21,7 +22,8 @@ export function AddProduct({ onViewChange }: AddProductProps) {
     precioUnitario: "",
     proveedor: "",
     peso: "",
-    dimensiones: ""
+    dimensiones: "",
+    URLImagen: ""
   });
   const [selectedImage, setSelectedImage] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
@@ -92,65 +94,90 @@ export function AddProduct({ onViewChange }: AddProductProps) {
 
 
   const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  e.preventDefault();
 
-    if (
-      !formData.nombre || 
-      !formData.categoria || 
-      !formData.unidaMedida || 
-      !formData.Stock || 
-      !formData.precioUnitario || 
-      !formData.proveedor
-    ) {
-      toast.error("Por favor, completa todos los campos");
-      return;
-    }
+  if (
+    !formData.nombre ||
+    !formData.categoria ||
+    !formData.unidaMedida ||
+    !formData.Stock ||
+    !formData.stockMinimo ||
+    !formData.dimensiones ||
+    !formData.peso ||
+    !formData.precioUnitario ||
+    !formData.proveedor
+  ) {
+    toast.error("Por favor, completa todos los campos");
+    return;
+  }
 
-    try {
-      const response = await fetch("http://localhost:5000/producto", {
+  try {
+    // 1️⃣ Guardar producto en la BD
+    const response = await fetch("http://localhost:5000/producto", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        nombre: formData.nombre,
+        categoria: formData.categoria,
+        Stock: parseInt(formData.Stock, 10),
+        stockMinimo: parseInt(formData.stockMinimo, 10),
+        unidadMedida: formData.unidaMedida,
+        dimensiones: formData.dimensiones,
+        precioUnitario: parseFloat(formData.precioUnitario),
+        peso: parseFloat(formData.peso),
+        proveedor: formData.proveedor,
+        URLImagen: formData.URLImagen, // Se actualizará después
+      }),
+    });
+
+    if (!response.ok) throw new Error("Error al guardar el producto");
+
+    const data = await response.json();
+    const idProducto = data.idProducto;
+    
+    // 2️⃣ Subir imagen (si hay)
+    if (selectedImage) {
+      const formDataImage = new FormData();
+      formDataImage.append("image", selectedImage);
+      formDataImage.append("idProducto", String(idProducto));
+
+      const imgRes = await fetch("http://localhost:5000/producto/upload", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          nombre: formData.nombre,
-          categoria: formData.categoria,
-          unidadMedida: formData.unidaMedida,
-          Stock: parseInt(formData.Stock, 10),
-          precioUnitario: parseFloat(formData.precioUnitario),
-          proveedor: formData.proveedor
-        })
+        body: formDataImage,
       });
 
-      if (!response.ok) {
-        throw new Error("Error al guardar el producto");
-      }
-
-      toast.success("Producto agregado exitosamente");
-
-      // Limpiar formulario
-      setFormData({
-        nombre: "",
-        categoria: "",
-        unidaMedida: "",
-        Stock: "",
-        stockMinimo: "",
-        precioUnitario: "",
-        proveedor: "",
-        peso: "",
-        dimensiones: ""
-      });
-
-      setTimeout(() => {
-        onViewChange("inventory");
-      }, 1000);
-    } catch (error) {
-      console.error(error);
-      toast.error("Hubo un problema al guardar el producto");
+      if (!imgRes.ok) throw new Error("Error al subir imagen");
     }
-  };
+
+    toast.success("Producto agregado exitosamente");
+
+    // Limpiar formulario
+    setFormData({
+      nombre: "",
+      categoria: "",
+      unidaMedida: "",
+      Stock: "",
+      stockMinimo: "",
+      precioUnitario: "",
+      proveedor: "",
+      peso: "",
+      dimensiones: "",
+      URLImagen: "",
+    });
+    setSelectedImage(null);
+    setImagePreview(null);
+    setTimeout(() => {
+      onViewChange("inventory");
+    }, 1000);
+  } catch (error) {
+    console.error(error);
+    toast.error("Hubo un problema al guardar el producto");
+  }
+};
 
   return (
     <div className="flex-1 p-6">
-      <div className="mb-6 flex items-center gap-4">
+      <div className="mb-6 flex items-center gap-4 ">
         <Button 
           variant="outline" 
           onClick={() => onViewChange('inventory')}
@@ -165,203 +192,206 @@ export function AddProduct({ onViewChange }: AddProductProps) {
         </div>
       </div>
 
-      <Card className="max-w-2xl border-slate-200 rounded-lg">
+      <Card className="max-w-2xl border-slate-200 rounded-lg ">
         <CardHeader>
-          <CardTitle className="text-slate-800">Información del Producto</CardTitle>
+          
           <CardDescription className="text-slate-600">
             Completa todos los campos para agregar el producto al inventario
           </CardDescription>
         </CardHeader>
         <CardContent>
           <form onSubmit={handleSubmit} className="space-y-6">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="name" className="text-slate-700">Nombre del Producto</Label>
-                <div className="relative">
-                  <Input
-                    id="name"
-                    value={formData.nombre}
-                    onChange={(e) => handleInputChange('nombre', e.target.value)}
-                    placeholder="Ej: Impermeabilizante Acrílico"
-                    className="rounded-lg border-slate-300 pr-16"
-                    maxLength={100}
-                  />
-                  <span className={`absolute right-3 top-1/2 transform -translate-y-1/2 text-xs pointer-events-none ${
-                    formData.nombre.length > 80 
-                      ? 'text-red-500' 
-                      : formData.nombre.length > 60 
-                        ? 'text-amber-500' 
-                        : 'text-slate-400'
-                  }`}>
-                    {formData.nombre.length}/100
-                  </span>
-                </div>
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="categoria" className="text-slate-700">Categoría</Label>
-                <Select value={formData.categoria} onValueChange={(value) => handleInputChange('categoria', value)}>
-                  <SelectTrigger className="rounded-lg border-slate-300">
-                    <SelectValue placeholder="Selecciona categoría" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {categorias.map((categoria) => (
-                      <SelectItem key={categoria} value={categoria}>
-                        {categoria}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-
-              
-
-              <div className="space-y-2">
-                <Label htmlFor="initialStock" className="text-slate-700">Stock Inicial</Label>
-                <Input
-                  id="initialStock"
-                  type="number"
-                  value={formData.Stock}
-                  onChange={(e) => handleInputChange('Stock', e.target.value)}
-                  placeholder="Ej: 50"
-                  min="0"
-                  className="rounded-lg border-slate-300"
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="stockMinimo" className="text-slate-700">Stock Minimo</Label>
-                <Input
-                  id="stockMinimo"
-                  type="number"
-                  value={formData.stockMinimo}
-                  onChange={(e) => handleInputChange('stockMinimo', e.target.value)}
-                  placeholder="Ej: 50"
-                  min="0"
-                  className="rounded-lg border-slate-300"
-                />
-              </div>      
-              <div className="space-y-2">
-                <Label htmlFor="unitMeasure" className="text-slate-700">Unidad de Medida</Label>
-                <Select value={formData.unidaMedida} onValueChange={(value) => handleInputChange('unidaMedida', value)}>
-                  <SelectTrigger className="rounded-lg border-slate-300">
-                    <SelectValue placeholder="Selecciona unidad" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {unidadesMedida.map((unit) => (
-                      <SelectItem key={unit} value={unit}>
-                        {unit}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="unitPrice" className="text-slate-700">Precio Unitario</Label>
-                <Input
-                  id="unitPrice"
-                  type="number"
-                  step="0.01"
-                  value={formData.precioUnitario}
-                  onChange={(e) => handleInputChange('precioUnitario', e.target.value)}
-                  placeholder="Ej: 45.99"
-                  min="0"
-                  className="rounded-lg border-slate-300"
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="dimensiones" className="text-slate-700">Dimensiones</Label>
-                <div className="relative">
-                  <Input
-                    id="dimensiones"
-                    value={formData.dimensiones}
-                    onChange={(e) => handleInputChange('dimensiones', e.target.value)}
-                    placeholder="Ej: 10 cm x 10 cm"
-                    className="rounded-lg border-slate-300 pr-16"
-                    maxLength={20}
-                  />
-                  <span className={`absolute right-3 top-1/2 transform -translate-y-1/2 text-xs pointer-events-none ${
-                    formData.dimensiones.length > 20 
-                      ? 'text-red-500' 
-                      : formData.dimensiones.length > 15 
-                        ? 'text-amber-500' 
-                        : 'text-slate-400'
-                  }`}>
-                    {formData.dimensiones.length}/20
-                  </span>
-                </div>
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="peso" className="text-slate-700">Peso</Label>
-                <Input
-                  id="peso"
-                  type="number"
-                  step="0.01"
-                  value={formData.peso}
-                  onChange={(e) => handleInputChange('peso', e.target.value)}
-                  placeholder="Kg"
-                  className="rounded-lg border-slate-300"
-                />
-              </div>      
-              <div className="space-y-2">
-                <Label htmlFor="supplier" className="text-slate-700">Proveedor</Label>
-                <Select value={formData.proveedor} onValueChange={(value) => handleInputChange('proveedor', value)}>
-                  <SelectTrigger className="rounded-lg border-slate-300">
-                    <SelectValue placeholder="Selecciona proveedor" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {proveedores.map((supplier) => (
-                      <SelectItem key={supplier} value={supplier}>
-                        {supplier}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
-            {/* Sección de imagen */}
-            <div className="space-y-4 pt-6 border-t border-slate-200">
-              <div>
-                <Label className="text-slate-700 text-lg">Imagen del Producto</Label>
-                <p className="text-sm text-slate-600 mt-1">Agrega una imagen representativa del producto (máximo 5MB)</p>
-              </div>
-              
-              {!imagePreview ? (
-                <div className="border-2 border-dashed border-slate-300 rounded-lg p-8 text-center hover:border-blue-400 transition-colors">
-                  <input
-                    type="file"
-                    accept="image/*"
-                    onChange={handleImageChange}
-                    className="hidden"
-                    id="image-upload"
-                  />
-                  <label htmlFor="image-upload" className="cursor-pointer">
-                    <Upload className="h-12 w-12 text-slate-400 mx-auto mb-4" />
-                    <p className="text-slate-600 mb-2">Haz clic para seleccionar una imagen</p>
-                    <p className="text-sm text-slate-500">PNG, JPG, GIF hasta 5MB</p>
-                  </label>
-                </div>
-              ) : (
-                <div className="relative inline-block">
-                  <img
-                    src={imagePreview}
-                    alt="Vista previa"
-                    className="w-48 h-48 object-cover rounded-lg border border-slate-300"
-                  />
-                  <button
-                    type="button"
-                    onClick={removeImage}
-                    className="absolute -top-2 -right-2 bg-red-500 hover:bg-red-600 text-white rounded-full p-1 transition-colors"
-                  >
-                    <X className="h-4 w-4" />
-                  </button>
-                  <div className="mt-2">
-                    <p className="text-sm text-slate-600">
-                      {selectedImage?.name} ({((selectedImage?.size || 0) / 1024 / 1024).toFixed(2)} MB)
-                    </p>
+            <div className="parent">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 formulario">
+                <div className="space-y-2">
+                  <Label htmlFor="name" className="text-slate-700">Nombre del Producto</Label>
+                  <div className="relative">
+                    <Input
+                      id="name"
+                      value={formData.nombre}
+                      onChange={(e) => handleInputChange('nombre', e.target.value)}
+                      placeholder="Ej: Impermeabilizante Acrílico"
+                      className="rounded-lg border-slate-300 pr-16"
+                      maxLength={100}
+                    />
+                    <span className={`absolute right-3 top-1/2 transform -translate-y-1/2 text-xs pointer-events-none ${
+                      formData.nombre.length > 80 
+                        ? 'text-red-500' 
+                        : formData.nombre.length > 60 
+                          ? 'text-amber-500' 
+                          : 'text-slate-400'
+                    }`}>
+                      {formData.nombre.length}/100
+                    </span>
                   </div>
                 </div>
-              )}
-            </div>        
+
+                <div className="space-y-2">
+                  <Label htmlFor="categoria" className="text-slate-700">Categoría</Label>
+                  <Select value={formData.categoria} onValueChange={(value) => handleInputChange('categoria', value)}>
+                    <SelectTrigger className="rounded-lg border-slate-300">
+                      <SelectValue placeholder="Selecciona categoría" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {categorias.map((categoria) => (
+                        <SelectItem key={categoria} value={categoria}>
+                          {categoria}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                
+
+                <div className="space-y-2">
+                  <Label htmlFor="initialStock" className="text-slate-700">Stock Inicial</Label>
+                  <Input
+                    id="initialStock"
+                    type="number"
+                    value={formData.Stock}
+                    onChange={(e) => handleInputChange('Stock', e.target.value)}
+                    placeholder="Ej: 50"
+                    min="0"
+                    className="rounded-lg border-slate-300"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="stockMinimo" className="text-slate-700">Stock Minimo</Label>
+                  <Input
+                    id="stockMinimo"
+                    type="number"
+                    value={formData.stockMinimo}
+                    onChange={(e) => handleInputChange('stockMinimo', e.target.value)}
+                    placeholder="Ej: 50"
+                    min="0"
+                    className="rounded-lg border-slate-300"
+                  />
+                </div>      
+                <div className="space-y-2">
+                  <Label htmlFor="unitMeasure" className="text-slate-700">Unidad de Medida</Label>
+                  <Select value={formData.unidaMedida} onValueChange={(value) => handleInputChange('unidaMedida', value)}>
+                    <SelectTrigger className="rounded-lg border-slate-300">
+                      <SelectValue placeholder="Selecciona unidad" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {unidadesMedida.map((unit) => (
+                        <SelectItem key={unit} value={unit}>
+                          {unit}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="unitPrice" className="text-slate-700">Precio Unitario</Label>
+                  <Input
+                    id="unitPrice"
+                    type="number"
+                    step="0.01"
+                    value={formData.precioUnitario}
+                    onChange={(e) => handleInputChange('precioUnitario', e.target.value)}
+                    placeholder="Ej: 45.99"
+                    min="0"
+                    className="rounded-lg border-slate-300"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="dimensiones" className="text-slate-700">Dimensiones</Label>
+                  <div className="relative">
+                    <Input
+                      id="dimensiones"
+                      value={formData.dimensiones}
+                      onChange={(e) => handleInputChange('dimensiones', e.target.value)}
+                      placeholder="Ej: 10 cm x 10 cm"
+                      className="rounded-lg border-slate-300 pr-16"
+                      maxLength={20}
+                    />
+                    <span className={`absolute right-3 top-1/2 transform -translate-y-1/2 text-xs pointer-events-none ${
+                      formData.dimensiones.length > 19 
+                        ? 'text-red-500' 
+                        : formData.dimensiones.length > 15 
+                          ? 'text-amber-500' 
+                          : 'text-slate-400'
+                    }`}>
+                      {formData.dimensiones.length}/20
+                    </span>
+                  </div>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="peso" className="text-slate-700">Peso</Label>
+                  <Input
+                    id="peso"
+                    type="number"
+                    step="0.01"
+                    value={formData.peso}
+                    onChange={(e) => handleInputChange('peso', e.target.value)}
+                    placeholder="Kg"
+                    className="rounded-lg border-slate-300"
+                  />
+                </div>      
+                <div className="space-y-2">
+                  <Label htmlFor="supplier" className="text-slate-700">Proveedor</Label>
+                  <Select value={formData.proveedor} onValueChange={(value) => handleInputChange('proveedor', value)}>
+                    <SelectTrigger className="rounded-lg border-slate-300">
+                      <SelectValue placeholder="Selecciona proveedor" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {proveedores.map((supplier) => (
+                        <SelectItem key={supplier} value={supplier}>
+                          {supplier}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+              {/* Sección de imagen */}
+              <div className="space-y-4 pt-6 border-t border-slate-200 imagen">
+                <div>
+                  <Label className="text-slate-700 text-lg">Imagen del Producto</Label>
+                  <p className="text-sm text-slate-600 mt-1">Agrega una imagen representativa del producto (máximo 5MB)</p>
+                </div>
+                
+                {!imagePreview ? (
+                  <div className="border-2 border-dashed border-slate-300 rounded-lg p-8 text-center hover:border-blue-400 transition-colors">
+                    <input
+                      type="file"
+                      accept="image/*"
+                      onChange={handleImageChange}
+                      className="hidden"
+                      id="image-upload"
+                    />
+                    <label htmlFor="image-upload" className="cursor-pointer">
+                      <Upload className="h-12 w-12 text-slate-400 mx-auto mb-4" />
+                      <p className="text-slate-600 mb-2">Haz clic para seleccionar una imagen</p>
+                      <p className="text-sm text-slate-500">PNG, JPG, GIF hasta 5MB</p>
+                    </label>
+                  </div>
+                ) : (
+                  <div className="relative inline-block">
+                    <img
+                      src={imagePreview}
+                      alt="Vista previa"
+                      className="w-48 h-48 object-cover rounded-lg border border-slate-300"
+                    />
+                    <button
+                      type="button"
+                      onClick={removeImage}
+                      className="absolute -top-2 -right-2 bg-red-500 hover:bg-red-600 text-white rounded-full p-1 transition-colors"
+                    >
+                      <X className="h-4 w-4" />
+                    </button>
+                    <div className="mt-2">
+                      <p className="text-sm text-slate-600">
+                        {selectedImage?.name} ({((selectedImage?.size || 0) / 1024 / 1024).toFixed(2)} MB)
+                      </p>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+                  
             <div className="flex gap-4 pt-4">
               <Button 
                 type="submit"

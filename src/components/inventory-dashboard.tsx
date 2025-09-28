@@ -86,16 +86,26 @@ export function InventoryDashboard({ onViewChange }: InventoryDashboardProps) {
     fileInputRef.current?.click();
   };
 
-  const handleImageChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+  const handleImageChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (file && selectedProduct) {
-      const imageUrl = URL.createObjectURL(file);
-      // En un sistema real, aquí subirías la imagen al servidor
-      // Por ahora, solo actualizamos la URL localmente
-      setSelectedProduct({
-        ...selectedProduct,
-        URLImagen: imageUrl
+      const formData = new FormData();
+      
+      formData.append("idProducto", selectedProduct.idProducto.toString());
+      formData.append("URLImagen", file);
+      const response = await fetch("http://localhost:5000/Productos", {
+        method: "POST",
+        body: formData,
       });
+
+      const data = await response.json();
+
+      if (data.success) {
+        setSelectedProduct({
+          ...selectedProduct,
+          URLImagen: data.URLImagen, // ruta que devuelve el backend
+        });
+      }
     }
   };
 
@@ -184,7 +194,7 @@ export function InventoryDashboard({ onViewChange }: InventoryDashboardProps) {
       </div>
 
       {/* Tabla de productos */}
-      <Card className="border-slate-200 rounded-lg h-[50px]">
+      <Card className="border-slate-200 rounded-lg h-[50px] gap-1">
         <CardHeader>
           <CardTitle className="text-slate-800 font-bold">Productos en Inventario</CardTitle>
           <CardDescription className="text-slate-600">

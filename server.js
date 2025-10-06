@@ -4,6 +4,7 @@ import cors from "cors";
 import multer from "multer";
 import path from "path";
 import fs from "fs";
+import sharp from "sharp";
 import { fileURLToPath } from "url";
 
 const app = express();
@@ -15,10 +16,10 @@ app.use(express.json());
 
 // Configuración de SQL Server
 const dbConfig = {
-  user: "imperuser",
+  user: "imperuser2",
   password: "1234",
   server: "DESKTOP-5144HB2", // o la IP de tu SQL
-  database: "InventarioImperqui",
+  database: "InventarioImper",
   options: {
     encrypt: false,
     trustServerCertificate: true,
@@ -64,70 +65,160 @@ app.get("/producto", async (req, res) => {
 // 📌 Crear un nuevo producto
 app.post("/producto", async (req, res) => {
   const {
+    idProducto,
     nombre,
     categoria,
+    tipo,
+    unidad,
     unidadMedida,
-    Stock,
-    stockMinimo,
+    color,
     precioUnitario,
-    proveedor,
-    dimensiones,
-    peso,
+    stock,
+    stockMinimo,
+    descripcion,
     URLImagen,
   } = req.body;
 
   try {
     const result = await pool
       .request()
-      .input("nombre", sql.NVarChar(100), nombre)
-      .input("categoria", sql.NVarChar(100), categoria)
-      .input("unidadMedida", sql.NVarChar(50), unidadMedida)
-      .input("Stock", sql.Int, Stock)
-      .input("stockMinimo", sql.Int, stockMinimo)
-      .input("dimensiones", sql.NVarChar(20), dimensiones)
+      .input("idProducto", sql.Int, idProducto)
+      .input("nombre", sql.NVarChar(50), nombre)
+      .input("categoria", sql.NVarChar(24), categoria)
+      .input("tipo", sql.NVarChar(10), tipo)
+      .input("unidad", sql.Int, unidad)
+      .input("unidadMedida", sql.NVarChar(10), unidadMedida)
+      .input("color", sql.NVarChar(15), color)
       .input("precioUnitario", sql.Decimal(10, 2), precioUnitario)
-      .input("peso", sql.Decimal(10, 2), peso)
-      .input("proveedor", sql.NVarChar(50), proveedor)
-      .input("URLImagen", sql.NVarChar(500), URLImagen)
+      .input("stock", sql.Int, stock)
+      .input("stockMinimo", sql.Int, stockMinimo)
+      .input("descripcion", sql.NVarChar(100), descripcion)
+      .input("URLImagen", sql.NVarChar(100), URLImagen)
       .query(`
-        INSERT INTO Producto (nombre, categoria, unidadMedida, Stock, stockMinimo, dimensiones, PrecioUnitario, peso, proveedor, URLImagen)
-        OUTPUT INSERTED.idProducto
-        VALUES (@nombre, @categoria, @unidadMedida, @Stock, @stockMinimo, @dimensiones, @precioUnitario, @peso, @proveedor, @URLImagen)
+        INSERT INTO Producto (idProducto, nombre, categoria, tipo, unidad, unidadMedida, color, precioUnitario, stock, stockMinimo, descripcion, URLImagen)
+        
+        VALUES (@idProducto, @nombre, @categoria, @tipo, @unidad, @unidadMedida, @color, @precioUnitario, @stock, @stockMinimo, @descripcion, @URLImagen)
       `);
-
-    const idProducto = result.recordset[0].idProducto;
+    //No se usa porque el codigo se pone manual, se usa la siguiente linea cuando el id se pone automatico
+    //const idProducto = result.recordset[0].idProducto;
     res.status(201).json({ message: "Producto agregado correctamente", idProducto });
   } catch (err) {
-    console.error("❌ Error al insertar producto:", err);
+    console.error("❌ Error al insertar producto:", err, "producto:",idProducto);
     res.status(500).json({ error: "Error al insertar producto" });
   }
 });
 
-// 📌 Subir imagen y actualizar la ruta en la BD
+// 📌 Subir imagen y actualizar la ruta en la BD (conversión a WebP + resize 1:1)
 app.post("/producto/upload", upload.single("image"), async (req, res) => {
   const idProducto = req.body.idProducto;
-  const ext = path.extname(req.file.originalname);
-  const newFilename = `${idProducto}${ext}`;
+
+  // Nombre final en WebP
+  const newFilename = `${idProducto}.webp`;
   const newPath = path.join(uploadDir, newFilename);
 
-  // Renombrar el archivo manualmente
-  fs.renameSync(req.file.path, newPath);
-  const imagePath = `/src/img/Productos/${newFilename}`;
-  // 👀 Verifica qué está llegando
-  console.log("📦 Datos recibidos en upload:");
-  console.log("➡️ idProducto:", idProducto);
-   console.log("📦 Imagen renombrada:", newFilename);
   try {
+    // Redimensionar a 1:1 y convertir a WebP
+    await sharp(req.file.path)
+      .resize(500, 500, { // 👈 tamaño cuadrado (ajústalo: 300x300, 500x500, etc.)
+        fit: "cover",      // recorta al centro si no es cuadrada
+        position: "centre" // asegura que el recorte se haga centrado
+      })
+      .webp({ quality: 80 }) // 👈 convierte a WebP
+      .toFile(newPath);
+
+    // Eliminar el archivo original subido por multer
+    fs.unlinkSync(req.file.path);
+
+    // Ruta pública que se guarda en la BD
+    const imagePath = `/src/img/Productos/${newFilename}`;
+
+    // Actualizar en BD
     await pool
       .request()
       .input("idProducto", sql.Int, idProducto)
       .input("URLImagen", sql.NVarChar(200), imagePath)
-      .query("UPDATE Producto SET URLImagen = @URLImagen WHERE idProducto = @idProducto");
+      .query(
+        "UPDATE Producto SET URLImagen = @URLImagen WHERE idProducto = @idProducto"
+      );
 
     res.json({ success: true, URLImagen: imagePath });
   } catch (err) {
-    console.error("❌ Error al actualizar imagen:", err);
-    res.status(500).json({ error: "Error al actualizar imagen" });
+    console.error("❌ Error al procesar imagen:", err);
+    res.status(500).json({ error: "Error al procesar imagen" });
+  }
+});
+
+// Endpoint para obtener productos
+app.get("/producto", async (req, res) => {
+  try {
+    let pool = await sql.connect(dbConfig);
+    let result = await pool.request().query(`
+      SELECT 
+        idProducto, 
+        nombre, 
+        stock, 
+        categoria, 
+        URLimagen
+      FROM Producto
+    `);
+
+    res.json(result.recordset); // Devuelve array con los productos
+  } catch (err) {
+    console.error(err);
+    res.status(500).send("Error al obtener productos");
+  }
+});
+// 📌 Aumentar stock de un producto
+app.put("/producto/:id/aumentar-stock", async (req, res) => {
+  const { id } = req.params; 
+  const { cantidad } = req.body; 
+
+  if (!cantidad || cantidad <= 0) {
+    return res.status(400).json({ error: "La cantidad debe ser mayor a 0" });
+  }
+
+  try {
+    await pool
+      .request()
+      .input("idProducto", sql.Int, id)
+      .input("cantidad", sql.Int, cantidad)
+      .query(`
+        UPDATE Producto 
+        SET stock = stock + @cantidad 
+        WHERE idProducto = @idProducto
+      `);
+
+    res.json({ success: true, message: `Stock de producto ${id} aumentado en ${cantidad}` });
+  } catch (err) {
+    console.error("❌ Error al actualizar stock:", err);
+    res.status(500).json({ error: "Error al actualizar stock" });
+  }
+});
+
+// 📌 Reducir stock de un producto
+app.put("/producto/:id/disminuir-stock", async (req, res) => {
+  const { id } = req.params; 
+  const { cantidad } = req.body; 
+
+  if (!cantidad || cantidad <= 0) {
+    return res.status(400).json({ error: "La cantidad debe ser mayor a 0" });
+  }
+
+  try {
+    await pool
+      .request()
+      .input("idProducto", sql.Int, id)
+      .input("cantidad", sql.Int, cantidad)
+      .query(`
+        UPDATE Producto 
+        SET stock = stock - @cantidad 
+        WHERE idProducto = @idProducto
+      `);
+
+    res.json({ success: true, message: `Stock de producto ${id} reducido en ${cantidad}` });
+  } catch (err) {
+    console.error("❌ Error al actualizar stock:", err);
+    res.status(500).json({ error: "Error al actualizar stock" });
   }
 });
 app.listen(5000, () => console.log("✅ Servidor corriendo en http://localhost:5000"));

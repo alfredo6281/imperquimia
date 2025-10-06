@@ -10,17 +10,13 @@ import { Badge } from "./ui/badge";
 import { Pagination, PaginationContent, PaginationItem, PaginationLink, PaginationNext, PaginationPrevious } from "./ui/pagination";
 
 interface MovementRecord {
-  id: string;
+  id: number;
   productId: string;
   productName: string;
   quantity: number;
   date: string;
   type: 'entries' | 'exits';
   userId: string;
-  userName: string;
-  userRole: string;
-  observations?: string;
-  timestamp: string;
 }
 
 interface MovementHistoryProps {
@@ -39,11 +35,11 @@ export function MovementHistory({ onViewChange }: MovementHistoryProps) {
 
   // Usuarios mock
   const users = [
-    { id: "1", name: "María González", role: "Supervisor de Inventario" },
-    { id: "2", name: "Carlos Rodríguez", role: "Operador de Almacén" },
-    { id: "3", name: "Ana López", role: "Jefe de Compras" },
-    { id: "4", name: "Roberto Martínez", role: "Asistente de Almacén" },
-    { id: "5", name: "Laura Silva", role: "Contador de Inventario" }
+    { id: "1", name: "María González" },
+    { id: "2", name: "Carlos Rodríguez"},
+    { id: "3", name: "Ana López" },
+    { id: "4", name: "Roberto Martínez"},
+    { id: "5", name: "Laura Silva"}
   ];
 
   useEffect(() => {
@@ -259,7 +255,6 @@ export function MovementHistory({ onViewChange }: MovementHistoryProps) {
                       <TableHead className="text-slate-700">Producto</TableHead>
                       <TableHead className="text-slate-700">Cantidad</TableHead>
                       <TableHead className="text-slate-700">Usuario</TableHead>
-                      <TableHead className="text-slate-700">Observaciones</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -309,9 +304,6 @@ export function MovementHistory({ onViewChange }: MovementHistoryProps) {
                               <span className="text-sm text-slate-500">{movement.userRole}</span>
                             </div>
                           </div>
-                        </TableCell>
-                        <TableCell className="text-slate-600 max-w-xs">
-                          {movement.observations || '-'}
                         </TableCell>
                       </TableRow>
                     ))}

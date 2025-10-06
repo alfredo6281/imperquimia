@@ -1,44 +1,50 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { ArrowLeft, Save, Package, TrendingUp, TrendingDown, Search } from "lucide-react";
 import { Button } from "./ui/button";
 import { Input } from "./ui/input";
 import { Label } from "./ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "./ui/select";
-import { Textarea } from "./ui/textarea";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "./ui/card";
-import { RadioGroup, RadioGroupItem } from "./ui/radio-group";
+
 import { toast } from "sonner";
 
+interface Product {
+  idProducto: number;
+  nombre: string;
+  categoria:string;
+  stock: number;
+  URLImagen: string;
+}
 interface InventoryMovementsProps {
   onViewChange: (view: string) => void;
   movementType: 'entries' | 'exits';
 }
 
 export function InventoryMovements({ onViewChange, movementType }: InventoryMovementsProps) {
+  
   const [formData, setFormData] = useState({
-    productId: "",
+    idProducto: "",
     quantity: "",
     date: new Date().toISOString().split('T')[0],
-    observations: "",
     movementType: movementType
   });
 
   const [productSearch, setProductSearch] = useState("");
+  const [products, setProducts] = useState<Product[]>([]);
 
-  // Productos mock
-  const products = [
-    { id: "1", name: "Impermeabilizante Acrílico Premium", currentStock: 25 },
-    { id: "2", name: "Membrana Prefabricada APP", currentStock: 5 },
-    { id: "3", name: "Sellador Poliuretano", currentStock: 15 },
-    { id: "4", name: "Impermeabilizante Elastomérico", currentStock: 3 },
-    { id: "5", name: "Primer Acrílico Base Agua", currentStock: 18 }
-  ];
 
-  const selectedProduct = products.find(p => p.id === formData.productId);
+  useEffect(() => {
+    fetch("http://localhost:5000/producto")   // <--- tu endpoint del server.js
+      .then((res) => res.json())
+      .then((data) => {
+        setProducts(data);
+      })
+      .catch((err) => console.error("Error al cargar productos:", err));
+  }, []);
 
-  // Filtrar productos por búsqueda
-  const filteredProducts = products.filter(product =>
-    product.name.toLowerCase().includes(productSearch.toLowerCase())
+  const selectedProduct = products.find(p => p.idProducto.toString() === formData.idProducto);
+
+  const filteredProducts = products.filter((product) =>
+    product.nombre.toLowerCase().includes(productSearch.toLowerCase())
   );
 
   const handleInputChange = (field: string, value: string) => {
@@ -48,21 +54,13 @@ export function InventoryMovements({ onViewChange, movementType }: InventoryMove
     }));
   };
 
-  const handleMovementTypeChange = (value: string) => {
-    // Limpiar selección de producto y búsqueda cuando cambia el tipo
-    setFormData(prev => ({
-      ...prev,
-      movementType: value,
-      productId: ""
-    }));
-    setProductSearch("");
-  };
 
-  const handleSubmit = (e: React.FormEvent) => {
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
     // Validación básica
-    if (!formData.productId || !formData.quantity || !formData.date) {
+    if (!formData.idProducto || !formData.quantity || !formData.date) {
       toast.error("Por favor, completa todos los campos requeridos");
       return;
     }
@@ -74,29 +72,48 @@ export function InventoryMovements({ onViewChange, movementType }: InventoryMove
     }
 
     // Validar salida no mayor al stock actual
-    if (formData.movementType === 'exits' && selectedProduct && quantity > selectedProduct.currentStock) {
-      toast.error(`No hay suficiente stock. Stock actual: ${selectedProduct.currentStock}`);
+    if (formData.movementType === 'exits' && selectedProduct && quantity > selectedProduct.stock) {
+      toast.error(`No hay suficiente stock. Stock actual: ${selectedProduct.stock}`);
       return;
     }
+    try {
+      const url =
+        formData.movementType === "entries"
+          ? `http://localhost:5000/producto/${formData.idProducto}/aumentar-stock`
+          : `http://localhost:5000/producto/${formData.idProducto}/disminuir-stock`;
 
-    // Simular registro del movimiento
-    const actionText = formData.movementType === 'entries' ? 'entrada' : 'salida';
-    toast.success(`${actionText.charAt(0).toUpperCase() + actionText.slice(1)} registrada exitosamente`);
-    
-    // Limpiar formulario
-    setFormData({
-      productId: "",
-      quantity: "",
-      date: new Date().toISOString().split('T')[0],
-      observations: "",
-      movementType: movementType
-    });
+      const res = await fetch(url, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ cantidad: quantity }),
+      });
 
-    // Regresar al inventario después de 1 segundo
-    setTimeout(() => {
-      onViewChange('inventory');
-    }, 1000);
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Error en el servidor");
+
+      toast.success(
+        `${formData.movementType === "entries" ? "Entrada" : "Salida"} registrada exitosamente`
+      );
+
+      // Resetear form
+      setFormData({
+        idProducto: "",
+        quantity: "",
+        date: new Date().toISOString().split("T")[0],
+        movementType: movementType,
+      });
+      setProductSearch("");
+
+      setTimeout(() => {
+        onViewChange("inventory");
+      }, 1000);
+    } catch (err: any) {
+      console.error(err);
+      toast.error("❌ Error al registrar el movimiento");
+    }
   };
+
+
 
   const isEntry = movementType === 'entries';
   const title = isEntry ? 'Registrar Entrada' : 'Registrar Salida';
@@ -137,85 +154,94 @@ export function InventoryMovements({ onViewChange, movementType }: InventoryMove
         </CardHeader>
         <CardContent>
           <form onSubmit={handleSubmit} className="space-y-6">
+            {/* Búsqueda de productos */}
             <div className="space-y-2">
-              <Label className="text-slate-700">Tipo de Movimiento</Label>
-              <RadioGroup 
-                value={formData.movementType} 
-                onValueChange={handleMovementTypeChange}
-                className="flex gap-6"
-              >
-                <div className="flex items-center space-x-2">
-                  <RadioGroupItem value="entries" id="entries" />
-                  <Label htmlFor="entries" className="flex items-center gap-2 text-slate-700">
-                    <TrendingUp className="h-4 w-4 text-green-600" />
-                    Entrada
-                  </Label>
-                </div>
-                <div className="flex items-center space-x-2">
-                  <RadioGroupItem value="exits" id="exits" />
-                  <Label htmlFor="exits" className="flex items-center gap-2 text-slate-700">
-                    <TrendingDown className="h-4 w-4 text-red-600" />
-                    Salida
-                  </Label>
-                </div>
-              </RadioGroup>
-            </div>
-
-            {/* Búsqueda de productos - solo visible después de seleccionar tipo */}
-            {formData.movementType && (
-              <div className="space-y-2">
-                <Label htmlFor="productSearch" className="text-slate-700">Buscar Producto</Label>
-                <div className="relative">
-                  <Search className="absolute left-3 top-3 h-4 w-4 text-slate-400" />
-                  <Input
-                    id="productSearch"
-                    value={productSearch}
-                    onChange={(e) => setProductSearch(e.target.value)}
-                    placeholder="Escribe el nombre del producto..."
-                    className="pl-10 rounded-lg border-slate-300"
-                  />
-                </div>
-                {productSearch && (
+              <Label htmlFor="productSearch" className="text-slate-700">Buscar Producto *</Label>
+              <div className="relative">
+                <Search className="absolute left-3 top-3 h-4 w-4 text-slate-400" />
+                <Input
+                  id="productSearch"
+                  value={productSearch}
+                  onChange={(e) => setProductSearch(e.target.value)}
+                  placeholder="Escribe el nombre del producto..."
+                  className="pl-10 rounded-lg border-slate-300"
+                  autoComplete="off"
+                />
+              </div>
+              {productSearch && filteredProducts.length > 0 && (
+                <div className="space-y-2">
                   <p className="text-sm text-slate-600">
                     {filteredProducts.length} producto{filteredProducts.length !== 1 ? 's' : ''} encontrado{filteredProducts.length !== 1 ? 's' : ''}
                   </p>
-                )}
-              </div>
-            )}
-
-            {/* Selector de producto - solo visible después de seleccionar tipo */}
-            {formData.movementType && (
-              <div className="space-y-2">
-                <Label htmlFor="product" className="text-slate-700">Producto *</Label>
-                <Select 
-                  value={formData.productId} 
-                  onValueChange={(value) => handleInputChange('productId', value)}
-                >
-                  <SelectTrigger className="rounded-lg border-slate-300">
-                    <SelectValue placeholder="Selecciona un producto" />
-                  </SelectTrigger>
-                  <SelectContent>
+                  {/* Lista de productos encontrados con imágenes */}
+                  <div className="max-h-40 overflow-y-auto space-y-2 border rounded-lg border-slate-200 p-2">
                     {filteredProducts.map((product) => (
-                      <SelectItem key={product.id} value={product.id}>
-                        <div className="flex justify-between items-center w-full">
-                        <span>{product.name}</span>
-                        <span className="text-sm text-slate-500 ml-2">Stock: {product.currentStock}</span>
+                      <div 
+                        key={product.idProducto}
+                        onClick={() => {
+                          handleInputChange('idProducto', product.idProducto.toString());
+                          setProductSearch(product.nombre);
+                        }}
+                        className="flex items-center gap-3 p-2 hover:bg-slate-50 rounded-lg cursor-pointer"
+                      >
+                        <img 
+                          src={product.URLImagen?  `http://localhost:5000/img/Productos/${product.idProducto}.webp` : `src/img/no_image.webp`} 
+                          alt={product.nombre}
+                          className="w-8 h-8 object-cover rounded border"
+                          
+                        />
+                        <div className="flex-1">
+                          <p className="text-sm font-medium text-slate-700">{product.nombre}</p>
+                          <p className="text-xs text-slate-500">Stock: {product.stock} • Categoría: {product.categoria}</p>
+                        </div>
                       </div>
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              {selectedProduct && (
-                <p className="text-sm text-slate-600">
-                  Stock actual: <span className="font-medium">{selectedProduct.currentStock}</span> unidades
-                </p>
+                    ))}
+                  </div>
+                </div>
+              )}
+              {productSearch && filteredProducts.length === 0 && (
+                <p className="text-sm text-slate-500">No se encontraron productos que coincidan con la búsqueda</p>
               )}
             </div>
-            )}
 
-            {/* Campos de cantidad y fecha - solo visibles después de seleccionar tipo */}
-            {formData.movementType && (
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {/* Producto seleccionado */}
+            {selectedProduct && (
+              <div className="space-y-2">
+                <Label className="text-slate-700">Producto Seleccionado</Label>
+                <div className="flex items-center gap-3 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                  <img 
+                    src={selectedProduct.URLImagen?  `http://localhost:5000/img/Productos/${selectedProduct.idProducto}.webp` : `src/img/no_image.webp`} 
+                    alt={selectedProduct.nombre}
+                    className="w-10 h-10 object-cover rounded border"
+                    onError={(e) => (e.currentTarget.src = `src/img/no_image.webp`)}
+                  />
+
+                  
+                  <div className="flex-1">
+                    <p className="font-medium text-slate-700">{selectedProduct.nombre}</p>
+                    <p className="text-sm text-slate-600">Categoría: {selectedProduct.categoria}</p>
+                    <p className="text-sm text-slate-600">
+                      Stock actual: <span className="font-medium">{selectedProduct.stock}</span> unidades
+                    </p>
+                  </div>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      setFormData(prev => ({ ...prev, idProducto: "" }));
+                      setProductSearch("");
+                    }}
+                    className="border-slate-300 text-slate-700 hover:bg-slate-50"
+                  >
+                    Cambiar
+                  </Button>
+                </div>
+              </div>
+            )}
+            
+            {/* Campos de cantidad y fecha */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label htmlFor="quantity" className="text-slate-700">Cantidad *</Label>
                 <Input
@@ -228,7 +254,7 @@ export function InventoryMovements({ onViewChange, movementType }: InventoryMove
                   className="rounded-lg border-slate-300"
                 />
                 {formData.movementType === 'exits' && selectedProduct && formData.quantity && 
-                 parseInt(formData.quantity) > selectedProduct.currentStock && (
+                 parseInt(formData.quantity) > selectedProduct.stock && (
                   <p className="text-sm text-red-600">
                     ⚠️ Cantidad excede el stock disponible
                   </p>
@@ -245,26 +271,10 @@ export function InventoryMovements({ onViewChange, movementType }: InventoryMove
                   className="rounded-lg border-slate-300"
                 />
               </div>
-              </div>
-            )}
+            </div>
 
-            {/* Campo de observaciones - solo visible después de seleccionar tipo */}
-            {formData.movementType && (
-              <div className="space-y-2">
-                <Label htmlFor="observations" className="text-slate-700">Observaciones</Label>
-                <Textarea
-                  id="observations"
-                  value={formData.observations}
-                  onChange={(e) => handleInputChange('observations', e.target.value)}
-                  placeholder="Agrega cualquier observación sobre este movimiento..."
-                  className="rounded-lg border-slate-300 min-h-[100px]"
-                />
-              </div>
-            )}
-
-            {/* Botones - solo visibles después de seleccionar tipo */}
-            {formData.movementType && (
-              <div className="flex gap-4 pt-4">
+            {/* Botones */}
+            <div className="flex gap-4 pt-4">
               <Button 
                 type="submit"
                 className={`${bgClass} text-white rounded-lg`}
@@ -280,8 +290,7 @@ export function InventoryMovements({ onViewChange, movementType }: InventoryMove
               >
                 Cancelar
               </Button>
-              </div>
-            )}
+            </div>
           </form>
         </CardContent>
       </Card>

@@ -6,6 +6,7 @@ import { AddProduct } from "./components/add-product";
 import { InventoryMovements } from "./components/inventory-movements";
 import { MovementHistory } from "./components/movement-history";
 import { Reports } from "./components/reports";
+import { NewQuote } from "./components/new-quote";
 
 export default function App() {
   const [activeView, setActiveView] = useState("inventory");
@@ -24,6 +25,8 @@ export default function App() {
         return <MovementHistory onViewChange={setActiveView} />;
       case 'reports':
         return <Reports onViewChange={setActiveView} />;
+      case 'quote':
+        return <NewQuote onViewChange={setActiveView} />;
       default:
         return <InventoryDashboard onViewChange={setActiveView} />;
     }

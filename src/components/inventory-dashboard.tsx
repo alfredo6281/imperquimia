@@ -10,17 +10,21 @@ import { ScrollArea } from "./ui/scroll-area";
 import { Pagination, PaginationContent, PaginationEllipsis, PaginationItem, PaginationLink, PaginationNext, PaginationPrevious } from "./ui/pagination";
 import { ImageWithFallback } from "./figma/ImageWithFallback";
 import axios from "axios";
-
+import { toast } from "sonner";
 interface Product {
   idProducto: number;
   nombre: string;
-  PrecioUnitario: number;
-  Stock: number;
+  precioUnitario: number;
+  stock: number;
   stockMinimo: number;
+  unidad:number;
   unidadMedida: string;
-  proveedor: string;
+  color: string;
   categoria: string;
+  descripcion: string;
+  tipo: string;
   URLImagen: string;
+  
 }
 
 interface InventoryDashboardProps {
@@ -39,19 +43,19 @@ export function InventoryDashboard({ onViewChange }: InventoryDashboardProps) {
   const [products, setProducts] = useState<Product[]>([]);
 
   useEffect(() => {
-  axios.get("http://localhost:5000/producto")
-    .then((res) => {
-      setProducts(res.data);
-    })
-    .catch((err) => {
-      console.error("Error al obtener productos:", err);
-    });
-}, []);
+    axios.get("http://localhost:5000/producto")
+      .then((res) => {
+        setProducts(res.data);
+      })
+      .catch((err) => {
+        console.error("Error al obtener productos:", err);
+      });
+  }, []);
 
   const filteredProducts = products.filter(product =>
     product.nombre.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    product.categoria.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    product.proveedor.toLowerCase().includes(searchTerm.toLowerCase())
+    product.categoria.toLowerCase().includes(searchTerm.toLowerCase()) //||
+    //product.idProducto.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
   // Cálculos para paginación
@@ -66,9 +70,9 @@ export function InventoryDashboard({ onViewChange }: InventoryDashboardProps) {
     setCurrentPage(1);
   };
 
-  const lowStockProducts = products.filter(product => product.Stock <= product.stockMinimo);
+  const lowStockProducts = products.filter(product => product.stock <= product.stockMinimo);
   const totalProducts = products.length;
-  const totalValue = products.reduce((sum, product) => sum + (product.Stock * product.PrecioUnitario), 0);
+  const totalValue = products.reduce((sum, product) => sum + (product.stock * product.precioUnitario), 0);
 
   const getStockStatus = (currentStock: number, minStock: number) => {
     if (currentStock <= minStock) {
@@ -92,8 +96,9 @@ export function InventoryDashboard({ onViewChange }: InventoryDashboardProps) {
       const formData = new FormData();
       
       formData.append("idProducto", selectedProduct.idProducto.toString());
-      formData.append("URLImagen", file);
-      const response = await fetch("http://localhost:5000/Productos", {
+      formData.append("image", file);
+      try {
+      const response = await fetch("http://localhost:5000/producto/upload", {
         method: "POST",
         body: formData,
       });
@@ -101,11 +106,28 @@ export function InventoryDashboard({ onViewChange }: InventoryDashboardProps) {
       const data = await response.json();
 
       if (data.success) {
+        const newUrl = `${data.URLImagen}?t=${Date.now()}`;
+        toast.error("Imagen actualizada");
         setSelectedProduct({
           ...selectedProduct,
-          URLImagen: data.URLImagen, // ruta que devuelve el backend
+          URLImagen: newUrl,
         });
+
+        setProducts((prev) =>
+          prev.map((p) =>
+            p.idProducto === selectedProduct.idProducto
+              ? { ...p, URLImagen: newUrl }
+              : p
+          )
+        );
+      } else {
+        toast.error("❌ Error al subir imagen");
+        console.error("❌ Error al subir imagen:", data.error);
       }
+    } catch (err) {
+      toast.error("❌ Error en la petición");
+      console.error("❌ Error en la petición:", err);
+    }
     }
   };
 
@@ -198,7 +220,7 @@ export function InventoryDashboard({ onViewChange }: InventoryDashboardProps) {
         <CardHeader>
           <CardTitle className="text-slate-800 font-bold">Productos en Inventario</CardTitle>
           <CardDescription className="text-slate-600">
-            Lista completa de productos impermeabilizantes
+            Lista completa de productos
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -206,28 +228,30 @@ export function InventoryDashboard({ onViewChange }: InventoryDashboardProps) {
             <Table>
               <TableHeader>
                 <TableRow className="border-slate-200">
+                  <TableHead className="text-slate-700 font-bold table-color">Código</TableHead>
                   <TableHead className="text-slate-700 font-bold table-color">Nombre del Producto</TableHead>
+                  <TableHead className="text-slate-700 font-bold table-color">Presentación</TableHead>
                   <TableHead className="text-slate-700 font-bold table-color">Categoría</TableHead>
                   <TableHead className="text-slate-700 font-bold table-color">Stock Actual</TableHead>
                   <TableHead className="text-slate-700 font-bold table-color">Stock Mínimo</TableHead>
-                  <TableHead className="text-slate-700 font-bold table-color">Precio Unitario</TableHead>
-                  <TableHead className="text-slate-700 font-bold table-color">Proveedor</TableHead>
                   <TableHead className="text-slate-700 font-bold table-color">Estado</TableHead>
-                  <TableHead className="text-slate-700 font-bold table-color">Acciones</TableHead>
+                  <TableHead className="text-slate-700 font-bold table-color">Detalles</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {currentProducts.map((product) => (
                   <TableRow key={product.idProducto} className="border-slate-200 hover:bg-slate-50">
+                    <TableCell className="font-medium text-slate-800">{product.idProducto}</TableCell>
                     <TableCell className="font-medium text-slate-800">{product.nombre}</TableCell>
+                    <TableCell className="text-slate-600">{product.tipo} {product.unidad} {product.unidadMedida} </TableCell>
                     <TableCell className="text-slate-600">{product.categoria}</TableCell>
-                    <TableCell className={`font-medium ${product.Stock <= product.stockMinimo ? 'text-red-600' : 'text-slate-800'}`}>
-                      {product.Stock}
+                    <TableCell className={`font-medium ${product.stock <= product.stockMinimo ? 'text-red-600' : 'text-slate-800'}`}>
+                      {product.stock}
                     </TableCell>
                     <TableCell className="text-slate-600">{product.stockMinimo}</TableCell>
-                    <TableCell className="text-slate-800">${product.PrecioUnitario}</TableCell>
-                    <TableCell className="text-slate-600">{product.proveedor}</TableCell>
-                    <TableCell>{getStockStatus(product.Stock, product.stockMinimo)}</TableCell>
+                    
+                    
+                    <TableCell>{getStockStatus(product.stock, product.stockMinimo)}</TableCell>
                     <TableCell>
                       <Button
                         variant="ghost"
@@ -305,12 +329,13 @@ export function InventoryDashboard({ onViewChange }: InventoryDashboardProps) {
 
       {/* Modal de visualización de producto */}
       <Dialog open={isViewModalOpen} onOpenChange={setIsViewModalOpen}>
-        <DialogContent className="max-w-6xl w-[95vw] max-h-[90vh] overflow-y-auto anchura_ventana">
+        <DialogContent className="max-w-6xl w-[95vw]  overflow-y-auto anchura_ventana">
           <DialogHeader>
-            <DialogTitle className="text-slate-800 text-xl">Detalles del Producto</DialogTitle>
-            <DialogDescription className="text-slate-600">
-              Información completa y especificaciones técnicas del producto seleccionado
-            </DialogDescription>
+            <DialogTitle className="text-slate-800 text-xl">{selectedProduct?.nombre}</DialogTitle>
+            <Badge variant="secondary" className="text-slate-600">{selectedProduct?.categoria}</Badge>
+            <p className="text-slate-600 leading-relaxed">
+                    {selectedProduct?.descripcion}
+                  </p>
           </DialogHeader>
           
           {selectedProduct && (
@@ -346,13 +371,13 @@ export function InventoryDashboard({ onViewChange }: InventoryDashboardProps) {
                 <div className="grid grid-cols-2 gap-4">
                   <Card className="border-slate-200">
                     <CardContent className="p-4 text-center">
-                      <div className="text-2xl font-bold text-slate-800">{selectedProduct.Stock}</div>
+                      <div className="text-2xl font-bold text-slate-800">{selectedProduct.stock}</div>
                       <p className="text-sm text-slate-600">Stock Actual</p>
                     </CardContent>
                   </Card>
                   <Card className="border-slate-200">
                     <CardContent className="p-4 text-center">
-                      <div className="text-2xl font-bold text-green-600">${selectedProduct.PrecioUnitario}</div>
+                      <div className="text-2xl font-bold text-green-600">${selectedProduct.precioUnitario}</div>
                       <p className="text-sm text-slate-600">Precio Unitario</p>
                     </CardContent>
                   </Card>
@@ -360,13 +385,13 @@ export function InventoryDashboard({ onViewChange }: InventoryDashboardProps) {
               </div>
 
               {/* Detalles del producto */}
-              <div className="space-y-6">
+              <div>
                 <div>
+                  {/*
                   <h3 className="text-lg font-semibold text-slate-800 mb-2">{selectedProduct.nombre}</h3>
                   <Badge variant="secondary" className="mb-4">{selectedProduct.categoria}</Badge>
-                  <p className="text-slate-600 leading-relaxed">
-                    {/*selectedProduct.description*/}
-                  </p>
+                  */}
+                  
                 </div>
 
                 {/* Especificaciones técnicas */}
@@ -374,25 +399,18 @@ export function InventoryDashboard({ onViewChange }: InventoryDashboardProps) {
                   <h4 className="font-medium text-slate-800">Especificaciones Técnicas</h4>
                   <div className="grid grid-cols-1 gap-3">
                     <div className="flex justify-between items-center py-2 border-b border-slate-100">
-                      <span className="text-slate-600">SKU:</span>
+                      <span className="text-slate-600">Codigo:</span>
                       <span className="font-medium text-slate-800">{selectedProduct.idProducto}</span>
                     </div>
                     <div className="flex justify-between items-center py-2 border-b border-slate-100">
-                      <span className="text-slate-600">Peso:</span>
-                      <span className="font-medium text-slate-800">{selectedProduct.PrecioUnitario} kg</span>
+                      <span className="text-slate-600">Presentación:</span>
+                      <span className="font-medium text-slate-800">{selectedProduct.tipo} {selectedProduct.unidad} {selectedProduct.unidadMedida}</span>
                     </div>
                     <div className="flex justify-between items-center py-2 border-b border-slate-100">
-                      <span className="text-slate-600">Dimensiones:</span>
-                      <span className="font-medium text-slate-800">{selectedProduct.Stock}</span>
+                      <span className="text-slate-600">Color:</span>
+                      <span className="font-medium text-slate-800">{selectedProduct.color}</span>
                     </div>
-                    <div className="flex justify-between items-center py-2 border-b border-slate-100">
-                      <span className="text-slate-600">Proveedor:</span>
-                      <span className="font-medium text-slate-800">{selectedProduct.proveedor}</span>
-                    </div>
-                    <div className="flex justify-between items-center py-2 border-b border-slate-100">
-                      <span className="text-slate-600">Fecha de ingreso:</span>
-                      <span className="font-medium text-slate-800">{selectedProduct.URLImagen}</span>
-                    </div>
+
                   </div>
                 </div>
 
@@ -404,15 +422,17 @@ export function InventoryDashboard({ onViewChange }: InventoryDashboardProps) {
                       <span className="text-slate-600">Stock mínimo:</span>
                       <span className="font-medium text-slate-800">{selectedProduct.stockMinimo} unidades</span>
                     </div>
+                    {/*
                     <div className="flex justify-between items-center py-2 border-b border-slate-100">
                       <span className="text-slate-600">Valor total en stock:</span>
                       <span className="font-medium text-green-600">
-                        ${(selectedProduct.Stock * selectedProduct.PrecioUnitario).toFixed(2)}
+                        ${(selectedProduct.stock * selectedProduct.precioUnitario).toFixed(2)}
                       </span>
                     </div>
+                    */}
                     <div className="flex justify-between items-center py-2">
                       <span className="text-slate-600">Estado:</span>
-                      {getStockStatus(selectedProduct.Stock, selectedProduct.stockMinimo)}
+                      {getStockStatus(selectedProduct.stock, selectedProduct.stockMinimo)}
                     </div>
                   </div>
                 </div>

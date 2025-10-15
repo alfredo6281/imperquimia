@@ -6,8 +6,9 @@ import { AddProduct } from "./components/add-product";
 import { InventoryMovements } from "./components/inventory-movements";
 import { MovementHistory } from "./components/movement-history";
 import { Reports } from "./components/reports";
+import { QuotesHistory } from "./components/quotes-history";
+import { CustomersManagement } from "./components/customers-management"
 import { NewQuote } from "./components/new-quote";
-
 export default function App() {
   const [activeView, setActiveView] = useState("inventory");
 
@@ -25,7 +26,11 @@ export default function App() {
         return <MovementHistory onViewChange={setActiveView} />;
       case 'reports':
         return <Reports onViewChange={setActiveView} />;
-      case 'quote':
+      case 'quote-history':
+        return <QuotesHistory onViewChange={setActiveView} />;
+      case 'client':
+        return <CustomersManagement onViewChange={setActiveView} />;
+      case 'new-quote':
         return <NewQuote onViewChange={setActiveView} />;
       default:
         return <InventoryDashboard onViewChange={setActiveView} />;

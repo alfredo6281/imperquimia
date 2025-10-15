@@ -1,72 +1,24 @@
-import { useEffect, useState } from "react";
-import axios from "axios";
+// src/app.js
+import express from "express";
+import cors from "cors";
+import path from "path";
+import productoRoutes from "./routes/productoRoutes.js";
+import clienteRoutes from "./routes/clienteRoutes.js";
+import movimientosRoutes from "./routes/movimientosRoutes.js";
+import cotizacionRoutes from "./routes/cotizacionRoutes.js";
 
-function App() {
-  const [productos, setProductos] = useState([]);
-  const [nuevo, setNuevo] = useState({ nombre: "", cantidad: "", id_unidad: 1 });
+const app = express();
+const __dirname = path.resolve();
 
-  // Obtener productos
-  const getProductos = async () => {
-    const res = await axios.get("http://localhost:5000/producto");
-    setProductos(res.data);
-  };
+app.use(cors());
+app.use(express.json());
+app.use("/img/Productos", express.static(path.join(__dirname, "src/img/Productos")));
+app.use("/api", productoRoutes);
+app.use("/api", clienteRoutes);
+app.use("/api", movimientosRoutes);
+app.use('/pdf', express.static(path.join(process.cwd(), 'src/pdf')));
+app.use('/api', cotizacionRoutes);
 
-  useEffect(() => {
-    getProductos();
-  }, []);
 
-  // Agregar producto
-  const addProducto = async () => {
-    await axios.post("http://localhost:5000/producto", nuevo);
-    setNuevo({ nombre: "", cantidad: "", id_unidad: 1 });
-    getProductos();
-  };
 
-  // Eliminar producto
-  const deleteProducto = async (id) => {
-    await axios.delete(`http://localhost:5000/producto/${id}`);
-    getProductos();
-  };
-
-  return (
-    <div style={{ padding: "20px" }}>
-      <h1>📦 Inventario</h1>
-
-      <div>
-        <input
-          type="text"
-          placeholder="Nombre"
-          value={nuevo.nombre}
-          onChange={(e) => setNuevo({ ...nuevo, nombre: e.target.value })}
-        />
-        <input
-          type="number"
-          placeholder="Cantidad"
-          value={nuevo.cantidad}
-          onChange={(e) => setNuevo({ ...nuevo, cantidad: e.target.value })}
-        />
-        <select
-          value={nuevo.id_unidad}
-          onChange={(e) => setNuevo({ ...nuevo, id_unidad: e.target.value })}
-        >
-          <option value={1}>Litros</option>
-          <option value={2}>Galones</option>
-          <option value={3}>Metros</option>
-          <option value={4}>m²</option>
-        </select>
-        <button onClick={addProducto}>Agregar</button>
-      </div>
-
-      <ul>
-        {productos.map((p) => (
-          <li key={p.id_producto}>
-            {p.nombre} - {p.cantidad} (unidad #{p.id_unidad})
-            <button onClick={() => deleteProducto(p.id_producto)}>❌</button>
-          </li>
-        ))}
-      </ul>
-    </div>
-  );
-}
-
-export default App;
+export default app;

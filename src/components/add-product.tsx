@@ -6,8 +6,6 @@ import { Label } from "./ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "./ui/select";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "./ui/card";
 import { toast } from "sonner";
-import type { Description } from "@radix-ui/react-dialog";
-
 
 interface AddProductProps {
   onViewChange: (view: string) => void;
@@ -19,7 +17,7 @@ export function AddProduct({ onViewChange }: AddProductProps) {
     nombre: "",
     categoria: "",
     unidad:"",
-    unidaMedida: "",
+    unidadMedida: "",
     tipo:"",
     stock: "",
     stockMinimo: "",
@@ -122,7 +120,7 @@ export function AddProduct({ onViewChange }: AddProductProps) {
     !formData.nombre ||
     !formData.categoria ||
     !formData.tipo ||
-    !formData.unidaMedida ||
+    !formData.unidadMedida ||
     !formData.stock ||
     !formData.stockMinimo ||
     !formData.precioUnitario ||
@@ -134,16 +132,16 @@ export function AddProduct({ onViewChange }: AddProductProps) {
 
   try {
     // 1️⃣ Guardar producto en la BD
-    const response = await fetch("http://localhost:5000/producto", {
+    const response = await fetch("http://localhost:5000/api/producto", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        idProducto: formData.idProducto,
+        idProducto: parseInt(formData.idProducto, 10),
         nombre: formData.nombre,
         categoria: formData.categoria,
         tipo: formData.tipo,
-        unidad: formData.unidad,
-        unidadMedida: formData.unidaMedida,
+        unidad: parseInt(formData.unidad || "0", 10),
+        unidadMedida: formData.unidadMedida,
         color: formData.color,
         precioUnitario: parseFloat(formData.precioUnitario),
         stock: parseInt(formData.stock, 10),
@@ -152,11 +150,14 @@ export function AddProduct({ onViewChange }: AddProductProps) {
         URLImagen: formData.URLImagen, // Se actualizará después
       }),
     });
-
+    console.log("Respuesta del servidor:", response);
+    const text = await response.text();
+    console.log("Texto devuelto:", text);
+    if (!response.ok) throw new Error(`Error al guardar el producto: ${response.status}`);
     if (!response.ok) throw new Error("Error al guardar el producto");
 
-    const data = await response.json();
-    const idProducto = data.idProducto;
+    //const data = await response.json();
+    const idProducto = formData.idProducto;
     
     // 2️⃣ Subir imagen (si hay)
     if (selectedImage) {
@@ -164,7 +165,7 @@ export function AddProduct({ onViewChange }: AddProductProps) {
       formDataImage.append("image", selectedImage);
       formDataImage.append("idProducto", String(idProducto));
 
-      const imgRes = await fetch("http://localhost:5000/producto/upload", {
+      const imgRes = await fetch("http://localhost:5000/api/producto/upload", {
         method: "POST",
         body: formDataImage,
       });
@@ -179,14 +180,14 @@ export function AddProduct({ onViewChange }: AddProductProps) {
       idProducto: "",
       nombre: "",
       categoria: "",
-      unidad:"",
-      unidaMedida: "",
+      unidad: "",
+      unidadMedida: "",
       stock: "",
-      tipo:"",
+      tipo: "",
       stockMinimo: "",
       precioUnitario: "",
       color: "",
-      descripcion:"",
+      descripcion: "",
       URLImagen: "",
     });
     setSelectedImage(null);
@@ -195,7 +196,7 @@ export function AddProduct({ onViewChange }: AddProductProps) {
       onViewChange("inventory");
     }, 1000);
   } catch (error) {
-    console.error(error);
+    console.error("Error detallado:", error);
     toast.error("Hubo un problema al guardar el producto: ");
   }
 };
@@ -229,7 +230,7 @@ export function AddProduct({ onViewChange }: AddProductProps) {
               <div className="parent">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4 formulario">
                   <div className="space-y-2">
-                    <Label htmlFor="id" className="text-slate-700">Codigo</Label>
+                    <Label htmlFor="id" className="text-slate-700">Código</Label>
                     <div className="relative">
                       <Input
                         id="id"
@@ -238,7 +239,7 @@ export function AddProduct({ onViewChange }: AddProductProps) {
                         type="number"
                         placeholder="10000000"
                         className="rounded-lg border-slate-300 pr-16"
-                        maxLength={8}
+                        maxLength={5}
                         autoComplete="off"
                       />
                       <span className={`absolute right-3 top-1/2 transform -translate-y-1/2 text-xs pointer-events-none ${
@@ -350,7 +351,7 @@ export function AddProduct({ onViewChange }: AddProductProps) {
                   </div>      
                   <div className="space-y-2">
                     <Label htmlFor="unitMeasure" className="text-slate-700">Unidad de Medida</Label>
-                    <Select value={formData.unidaMedida} onValueChange={(value) => handleInputChange('unidaMedida', value)}>
+                    <Select value={formData.unidadMedida} onValueChange={(value) => handleInputChange('unidadMedida', value)}>
                       <SelectTrigger className="rounded-lg border-slate-300">
                         <SelectValue placeholder="Selecciona unidad" />
                       </SelectTrigger>

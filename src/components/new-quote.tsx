@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { ArrowLeft, Plus, Trash2, Save, Calculator, FileText, Search, UserPlus, X, Download, ShoppingCart } from "lucide-react";
 import { Button } from "./ui/button";
 import { Input } from "./ui/input";
@@ -13,14 +13,32 @@ import { toast } from "sonner";
 interface NewQuoteProps {
   onViewChange: (view: string) => void;
 }
+interface Product { 
+  idProducto: number;
+  nombre: string;
+  categoria: string;
+  stock: number;
+  precioUnitario: number;
+  color: string;
+  unidad: number;
+  unidadMedida: string;
+  tipo: string;
+  URLImagen?: string;
+}
 
 interface QuoteItem {
   id: string;
   productId: string;
   productName: string;
   unitPrice: number;
+  color: string;
+  unity: number;
+  unitMed: string;
+  type: string;
   quantity: number;
   subtotal: number;
+  discount: number; // Descuento individual en porcentaje
+  notes: string;
 }
 
 export function NewQuote({ onViewChange }: NewQuoteProps) {
@@ -55,13 +73,15 @@ export function NewQuote({ onViewChange }: NewQuoteProps) {
     { id: "C005", name: "María González", phone: "555-0105", email: "maria@email.com" }
   ]);
 
-  const mockProducts = [
-    { id: "P001", name: "Impermeabilizante Acrílico Premium 5L", price: 114.99, stock: 25, category: "Acrílico" },
-    { id: "P002", name: "Sellador Elastomérico Ultra 1L", price: 49.99, stock: 40, category: "Sellador" },
-    { id: "P003", name: "Membrana Prefabricada SBS 10m²", price: 89.99, stock: 15, category: "Prefabricado" },
-    { id: "P004", name: "Primer Acrílico Base Agua 2L", price: 39.99, stock: 30, category: "Primer" },
-    { id: "P005", name: "Fibra de Vidrio Malla 5m", price: 9.99, stock: 50, category: "Fibrado" }
-  ];
+  const [products, setProducts] = useState<Product[]>([]);
+
+  useEffect(() => {
+    fetch("http://localhost:5000/api/producto")
+      .then((res) => res.json())
+      .then((data) => setProducts(data))
+      .catch((err) => console.error("Error cargando productos:", err));
+  }, []);
+
 
   // Filtrar clientes por término de búsqueda
   const filteredClients = mockClients.filter(client =>
@@ -71,9 +91,9 @@ export function NewQuote({ onViewChange }: NewQuoteProps) {
   );
 
   // Filtrar productos por término de búsqueda
-  const filteredProducts = mockProducts.filter(product =>
-    product.name.toLowerCase().includes(productSearchTerm.toLowerCase()) ||
-    product.category.toLowerCase().includes(productSearchTerm.toLowerCase())
+  const filteredProducts = products.filter(product =>
+    product.idProducto.toString().toLowerCase().includes(productSearchTerm.toLowerCase()) ||
+    product.nombre.toLowerCase().includes(productSearchTerm.toLowerCase())
   );
 
   const handleInputChange = (field: string, value: string | number) => {
@@ -109,6 +129,7 @@ export function NewQuote({ onViewChange }: NewQuoteProps) {
       id: newId,
       name: newClientData.name.trim(),
       phone: newClientData.phone.trim(),
+      address: newClientData.address.trim(),
       email: newClientData.email.trim() || ""
     };
 
@@ -131,7 +152,7 @@ export function NewQuote({ onViewChange }: NewQuoteProps) {
       clientId: client.id,
       clientName: client.name
     }));
-    setClientSearchTerm(client.name);
+    setClientSearchTerm(""); // Limpiar búsqueda al seleccionar
   };
 
   const addItem = () => {
@@ -140,24 +161,30 @@ export function NewQuote({ onViewChange }: NewQuoteProps) {
       return;
     }
 
-    const product = mockProducts.find(p => p.id === selectedProduct);
+    const product = products.find(p => p.idProducto.toString() === selectedProduct);
     if (!product) return;
 
     const existingItem = items.find(item => item.productId === selectedProduct);
     if (existingItem) {
       setItems(prev => prev.map(item => 
         item.productId === selectedProduct 
-          ? { ...item, quantity: item.quantity + quantity, subtotal: (item.quantity + quantity) * product.price }
+          ? { ...item, quantity: item.quantity + quantity, subtotal: (item.quantity + quantity) * product.precioUnitario }
           : item
       ));
     } else {
       const newItem: QuoteItem = {
         id: `item-${Date.now()}`,
         productId: selectedProduct,
-        productName: product.name,
-        unitPrice: product.price,
+        productName: product.nombre,
+        unitPrice: product.precioUnitario,
+        type: product.tipo,
+        color: product.color,
+        unity: product.unidad,
+        unitMed: product.unidadMedida,
         quantity: quantity,
-        subtotal: quantity * product.price
+        subtotal: quantity * product.precioUnitario,
+        discount: 0,
+        notes: ""
       };
       setItems(prev => [...prev, newItem]);
     }
@@ -200,17 +227,95 @@ export function NewQuote({ onViewChange }: NewQuoteProps) {
     toast.success("Precio actualizado");
   };
 
+  const updateItemDiscount = (
+    itemId: string,
+    newDiscount: number,
+  ) => {
+    if (newDiscount < 0 || newDiscount > 100) {
+      toast.error("El descuento debe estar entre 0% y 100%");
+      return;
+    }
+
+    setItems((prev) =>
+      prev.map((item) => {
+        if (item.id === itemId) {
+          const itemTotal = item.quantity * item.unitPrice;
+          const discountAmount = (itemTotal * newDiscount) / 100;
+          return {
+            ...item,
+            discount: newDiscount,
+            subtotal: itemTotal - discountAmount,
+          };
+        }
+        return item;
+      }),
+    );
+  };
+
   // Cálculos
   const subtotal = items.reduce((sum, item) => sum + item.subtotal, 0);
   const discountAmount = (subtotal * formData.discount) / 100;
   const taxableAmount = subtotal - discountAmount;
   const taxAmount = (taxableAmount * formData.tax) / 100;
   const total = taxableAmount + taxAmount;
+  const [nota, setNota] = useState("");
+  const date = new Date().toLocaleDateString("es-MX", {
+    day: "numeric",
+    month: "long",
+    year: "numeric"
+  });
+  const generatePDF = async () => {
+    if (!formData.clientId || items.length === 0) {
+      toast.error("Completa la cotización antes de generar el PDF");
+      return;
+    }
 
-  const generatePDF = () => {
-    toast.success("Generando PDF de cotización...");
-    // Aquí implementarías la generación real del PDF
+    toast.info("Generando PDF...");
+
+    try {
+      const response = await fetch("http://localhost:5000/api/cotizacion/pdf", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          numero: 123,
+          cliente: formData.clientName,
+          productos: items.map(item => ({
+            codigo: item.productId,
+            nombre: item.productName,
+            color: item.color,
+            tipo: item.type,
+            unidad: item.unity,
+            unidadMedida: item.unitMed,
+            cantidad: item.quantity,
+            precio: item.unitPrice,
+          })),
+          nota,
+          subtotal,
+          iva: taxAmount,
+          total,
+          date
+        })
+      });
+
+      if (!response.ok) {
+        toast.error("Error generando PDF en el servidor");
+        return;
+      }
+
+      const data = await response.json();
+      if (data && data.url) {
+        toast.success("PDF generado con éxito");
+        // Abrir URL pública (el navegador mostrará el PDF y sugerirá el nombre C-<numero>.pdf)
+        window.open(data.url, "_blank");
+      } else {
+        toast.error("No se devolvió URL del PDF");
+      }
+    } catch (error) {
+      console.error(error);
+      toast.error("Error al generar PDF");
+    }
   };
+
 
   const convertToSale = () => {
     if (!formData.clientId || items.length === 0) {
@@ -298,11 +403,11 @@ export function NewQuote({ onViewChange }: NewQuoteProps) {
       <div className="mb-6 flex items-center gap-4">
         <Button 
           variant="outline" 
-          onClick={() => onViewChange('sales')}
+          onClick={() => onViewChange('quote-history')}
           className="border-slate-300 text-slate-700 hover:bg-slate-50 rounded-lg"
         >
           <ArrowLeft className="h-4 w-4 mr-2" />
-          Volver a Ventas
+          Volver a Historial
         </Button>
         <div className="flex items-center gap-3">
           <FileText className="h-6 w-6 text-blue-600" />
@@ -322,112 +427,211 @@ export function NewQuote({ onViewChange }: NewQuoteProps) {
               <CardTitle className="text-slate-800">Información del Cliente</CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
-              <div className="space-y-2">
-                <div className="flex items-center justify-between">
-                  <Label htmlFor="client-search" className="text-slate-700">Buscar Cliente *</Label>
-                  <Dialog open={showNewClientModal} onOpenChange={setShowNewClientModal}>
-                    <DialogTrigger asChild>
-                      <button
-                        type="button"
-                        className="inline-flex items-center justify-center whitespace-nowrap rounded-md text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 border border-blue-300 text-blue-600 hover:bg-blue-50 h-8 px-3 py-1"
-                      >
-                        <UserPlus className="h-3 w-3 mr-1" />
-                        Nuevo Cliente
-                      </button>
-                    </DialogTrigger>
-                    <DialogContent className="sm:max-w-[425px]">
-                      <DialogHeader>
-                        <DialogTitle>Agregar Nuevo Cliente</DialogTitle>
-                        <DialogDescription>
-                          Completa la información del cliente para agregarlo al sistema.
-                        </DialogDescription>
-                      </DialogHeader>
-                      <div className="space-y-4 py-4">
-                        <div className="space-y-2">
-                          <Label htmlFor="new-client-name">Nombre/Razón Social *</Label>
-                          <Input
-                            id="new-client-name"
-                            value={newClientData.name}
-                            onChange={(e) => handleNewClientInputChange('name', e.target.value)}
-                            placeholder="Ej: Juan Pérez o Constructora ABC S.A."
-                            className="rounded-lg border-slate-300"
-                          />
-                        </div>
-                        <div className="space-y-2">
-                          <Label htmlFor="new-client-phone">Teléfono *</Label>
-                          <Input
-                            id="new-client-phone"
-                            value={newClientData.phone}
-                            onChange={(e) => handleNewClientInputChange('phone', e.target.value)}
-                            placeholder="Ej: 555-0123"
-                            className="rounded-lg border-slate-300"
-                          />
-                        </div>
-                        <div className="space-y-2">
-                          <Label htmlFor="new-client-email">Email</Label>
-                          <Input
-                            id="new-client-email"
-                            type="email"
-                            value={newClientData.email}
-                            onChange={(e) => handleNewClientInputChange('email', e.target.value)}
-                            placeholder="cliente@email.com"
-                            className="rounded-lg border-slate-300"
-                          />
-                        </div>
-                      </div>
-                      <div className="flex gap-3">
-                        <Button
-                          onClick={addNewClient}
-                          className="flex-1 bg-blue-600 hover:bg-blue-700 text-white rounded-lg"
-                        >
-                          <Save className="h-4 w-4 mr-2" />
-                          Agregar Cliente
-                        </Button>
-                        <Button
-                          type="button"
-                          variant="outline"
-                          onClick={() => setShowNewClientModal(false)}
-                          className="border-slate-300 text-slate-700 hover:bg-slate-50 rounded-lg"
-                        >
-                          Cancelar
-                        </Button>
-                      </div>
-                    </DialogContent>
-                  </Dialog>
-                </div>
-
-                <div className="relative">
-                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-slate-400" />
-                  <Input
-                    id="client-search"
-                    value={clientSearchTerm}
-                    onChange={(e) => setClientSearchTerm(e.target.value)}
-                    placeholder="Buscar por nombre, teléfono o email..."
-                    className="pl-10 rounded-lg border-slate-300"
-                  />
-                </div>
-
-                {clientSearchTerm && filteredClients.length > 0 && (
-                  <div className="border border-slate-200 rounded-lg max-h-40 overflow-y-auto">
-                    {filteredClients.map((client) => (
-                      <div
-                        key={client.id}
-                        onClick={() => handleClientSelect(client)}
-                        className="p-3 hover:bg-slate-50 cursor-pointer border-b border-slate-100 last:border-b-0"
-                      >
-                        <div className="font-medium text-slate-800">{client.name}</div>
-                        <div className="text-sm text-slate-600">{client.phone} • {client.email}</div>
-                      </div>
-                    ))}
+              {/* Cliente seleccionado o buscador */}
+              {selectedClient ? (
+                <div className="space-y-2">
+                  <Label className="text-slate-700">
+                    Cliente Seleccionado
+                  </Label>
+                  <div className="flex items-center gap-3 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+                    <div className="flex-1">
+                      <h4 className="font-medium text-slate-800">
+                        {selectedClient.name}
+                      </h4>
+                      <p className="text-sm text-slate-600">
+                        {selectedClient.phone}
+                      </p>
+                      <p className="text-sm text-slate-600">
+                        {selectedClient.email}
+                      </p>
+                    </div>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => {
+                        setFormData((prev) => ({
+                          ...prev,
+                          clientId: "",
+                          clientName: "",
+                        }));
+                        setClientSearchTerm("");
+                      }}
+                      className="border-slate-300 text-slate-700 hover:bg-slate-50 rounded-lg"
+                    >
+                      Cambiar
+                    </Button>
                   </div>
-                )}
-              </div>
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <Label
+                      htmlFor="client-search"
+                      className="text-slate-700"
+                    >
+                      Buscar Cliente *
+                    </Label>
+                    <Dialog
+                      open={showNewClientModal}
+                      onOpenChange={setShowNewClientModal}
+                    >
+                      <DialogTrigger asChild>
+                        <button
+                          type="button"
+                          className="inline-flex items-center justify-center whitespace-nowrap rounded-md text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 border border-blue-300 text-blue-600 hover:bg-blue-50 h-8 px-3 py-1"
+                        >
+                          <UserPlus className="h-3 w-3 mr-1" />
+                          Nuevo Cliente
+                        </button>
+                      </DialogTrigger>
+                      <DialogContent className="sm:max-w-[425px]">
+                        <DialogHeader>
+                          <DialogTitle>
+                            Agregar Nuevo Cliente
+                          </DialogTitle>
+                          <DialogDescription>
+                            Completa la información del cliente
+                            para agregarlo al sistema.
+                          </DialogDescription>
+                        </DialogHeader>
+                        <div className="space-y-4 py-4">
+                          <div className="space-y-2">
+                            <Label htmlFor="new-client-name">
+                              Nombre/Razón Social *
+                            </Label>
+                            <Input
+                              id="new-client-name"
+                              value={newClientData.name}
+                              onChange={(e) =>
+                                handleNewClientInputChange(
+                                  "name",
+                                  e.target.value,
+                                )
+                              }
+                              placeholder="Ej: Juan Pérez o Constructora ABC S.A."
+                              className="rounded-lg border-slate-300"
+                            />
+                          </div>
+                          <div className="space-y-2">
+                            <Label htmlFor="new-client-address">
+                              Dirección *
+                            </Label>
+                            <Input
+                              id="new-client-address"
+                              value={newClientData.address}
+                              onChange={(e) =>
+                                handleNewClientInputChange(
+                                  "address",
+                                  e.target.value,
+                                )
+                              }
+                              placeholder=""
+                              className="rounded-lg border-slate-300"
+                            />
+                          </div>
+                          <div className="space-y-2">
+                            <Label htmlFor="new-client-phone">
+                              Teléfono *
+                            </Label>
+                            <Input
+                              id="new-client-phone"
+                              value={newClientData.phone}
+                              onChange={(e) =>
+                                handleNewClientInputChange(
+                                  "phone",
+                                  e.target.value,
+                                )
+                              }
+                              placeholder="Ej: 555-0123"
+                              
+                              className="rounded-lg border-slate-300"
+                            />
+                          </div>
+                          <div className="space-y-2">
+                            <Label htmlFor="new-client-email">
+                              Email
+                            </Label>
+                            <Input
+                              id="new-client-email"
+                              type="email"
+                              value={newClientData.email}
+                              onChange={(e) =>
+                                handleNewClientInputChange(
+                                  "email",
+                                  e.target.value,
+                                )
+                              }
+                              placeholder="cliente@email.com"
+                              className="rounded-lg border-slate-300"
+                            />
+                          </div>
+                        </div>
+                        <div className="flex gap-3">
+                          <Button
+                            onClick={addNewClient}
+                            className="flex-1 bg-blue-600 hover:bg-blue-700 text-white rounded-lg"
+                          >
+                            <Save className="h-4 w-4 mr-2" />
+                            Agregar Cliente
+                          </Button>
+                          <Button
+                            type="button"
+                            variant="outline"
+                            onClick={() =>
+                              setShowNewClientModal(false)
+                            }
+                            className="border-slate-300 text-slate-700 hover:bg-slate-50 rounded-lg"
+                          >
+                            Cancelar
+                          </Button>
+                        </div>
+                      </DialogContent>
+                    </Dialog>
+                  </div>
 
-              {selectedClient && (
-                <div className="bg-slate-50 p-3 rounded-lg">
-                  <h4 className="font-medium text-slate-800">{selectedClient.name}</h4>
-                  <p className="text-sm text-slate-600">{selectedClient.phone}</p>
-                  <p className="text-sm text-slate-600">{selectedClient.email}</p>
+                  <div className="relative">
+                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-slate-400" />
+                    <Input
+                      id="client-search"
+                      value={clientSearchTerm}
+                      onChange={(e) =>
+                        setClientSearchTerm(e.target.value)
+                      }
+                      placeholder="Buscar por nombre, teléfono o email..."
+                      className="pl-10 rounded-lg border-slate-300"
+                    />
+                  </div>
+
+                  {clientSearchTerm &&
+                    filteredClients.length > 0 && (
+                      <div className="border border-slate-200 rounded-lg max-h-40 overflow-y-auto">
+                        {filteredClients.map((client) => (
+                          <div
+                            key={client.id}
+                            onClick={() =>
+                              handleClientSelect(client)
+                            }
+                            className="p-3 hover:bg-slate-50 cursor-pointer border-b border-slate-100 last:border-b-0 transition-colors"
+                          >
+                            <div className="font-medium text-slate-800">
+                              {client.name}
+                            </div>
+                            <div className="text-sm text-slate-600">
+                              {client.phone} • {client.email}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+
+                  {clientSearchTerm &&
+                    filteredClients.length === 0 && (
+                      <div className="p-4 text-center text-slate-500 text-sm border border-slate-200 rounded-lg">
+                        No se encontraron clientes. Intenta con
+                        otro término o agrega un nuevo cliente.
+                      </div>
+                    )}
                 </div>
               )}
             </CardContent>
@@ -456,15 +660,15 @@ export function NewQuote({ onViewChange }: NewQuoteProps) {
                   <div className="mt-2 border border-slate-200 rounded-lg max-h-40 overflow-y-auto">
                     {filteredProducts.map((product) => (
                       <div
-                        key={product.id}
+                        key={product.idProducto}
                         onClick={() => {
-                          setSelectedProduct(product.id);
+                          setSelectedProduct(product.idProducto.toString());
                           setProductSearchTerm("");
                         }}
                         className="p-3 hover:bg-slate-50 cursor-pointer border-b border-slate-100 last:border-b-0"
                       >
-                        <div className="font-medium text-slate-800">{product.name}</div>
-                        <div className="text-sm text-slate-600">${product.price} • Stock: {product.stock} • {product.category}</div>
+                        <div className="font-medium text-slate-800">{product.nombre}</div>
+                        <div className="text-sm text-slate-600">${product.precioUnitario} • Stock: {product.stock} • {product.categoria}</div>
                       </div>
                     ))}
                   </div>
@@ -479,12 +683,12 @@ export function NewQuote({ onViewChange }: NewQuoteProps) {
                       <SelectValue placeholder="Selecciona un producto" />
                     </SelectTrigger>
                     <SelectContent>
-                      {mockProducts.map((product) => (
-                        <SelectItem key={product.id} value={product.id}>
+                      {products.map((product) => (
+                        <SelectItem key={product.idProducto} value={product.idProducto.toString()}>
                           <div className="flex flex-col">
-                            <span className="font-medium">{product.name}</span>
+                            <span className="font-medium">{product.nombre}</span>
                             <span className="text-sm text-slate-500">
-                              ${product.price} • Stock: {product.stock} • {product.category}
+                              ${product.precioUnitario} • Stock: {product.stock} • {product.categoria}
                             </span>
                           </div>
                         </SelectItem>
@@ -515,60 +719,127 @@ export function NewQuote({ onViewChange }: NewQuoteProps) {
                 </div>
               </div>
 
-              {/* Lista de productos */}
               {items.length > 0 && (
                 <div className="border border-slate-200 rounded-lg">
                   <Table>
                     <TableHeader>
                       <TableRow>
                         <TableHead>Producto</TableHead>
-                        <TableHead className="w-20">Cantidad</TableHead>
-                        <TableHead className="w-28">Precio Unit.</TableHead>
-                        <TableHead className="w-24">Subtotal</TableHead>
-                        <TableHead className="w-16">Acciones</TableHead>
+                        <TableHead className="w-20">
+                          Cantidad
+                        </TableHead>
+                        <TableHead className="w-28">
+                          Precio Unit.
+                        </TableHead>
+                        <TableHead className="w-24">
+                          Desc. %
+                        </TableHead>
+                        <TableHead className="w-24">
+                          Subtotal
+                        </TableHead>
+                        <TableHead className="w-16">
+                          Acciones
+                        </TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {items.map((item) => (
-                        <TableRow key={item.id}>
-                          <TableCell className="font-medium">{item.productName}</TableCell>
-                          <TableCell>
-                            <Input
-                              type="number"
-                              value={item.quantity}
-                              onChange={(e) => updateItemQuantity(item.id, Number(e.target.value))}
-                              min="1"
-                              className="w-16 h-8 text-center border-slate-300"
-                            />
-                          </TableCell>
-                          <TableCell>
-                            <div className="flex items-center gap-1">
-                              <span className="text-xs text-slate-500">$</span>
+                      {items.map((item) => {
+                        const itemTotal = item.quantity * item.unitPrice;
+                        const discountAmount = (itemTotal * item.discount) / 100;
+                        
+                        return (
+                          <TableRow key={item.id}>
+                            <TableCell className="font-medium">
+                              {item.productName}
+                            </TableCell>
+                            <TableCell>
                               <Input
                                 type="number"
-                                value={item.unitPrice}
-                                onChange={(e) => updateItemPrice(item.id, Number(e.target.value))}
-                                min="0"
-                                step="0.01"
-                                className="w-20 h-8 text-center border-slate-300"
+                                value={item.quantity}
+                                onChange={(e) =>
+                                  updateItemQuantity(
+                                    item.id,
+                                    Number(e.target.value),
+                                  )
+                                }
+                                min="1"
+                                className="w-16 h-8 text-center border-slate-300"
                               />
-                            </div>
-                          </TableCell>
-                          <TableCell className="font-semibold">${item.subtotal.toFixed(2)}</TableCell>
-                          <TableCell>
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              onClick={() => removeItem(item.id)}
-                              className="h-8 w-8 p-0 border-red-300 text-red-600 hover:bg-red-50"
-                            >
-                              <Trash2 className="h-3 w-3" />
-                            </Button>
-                          </TableCell>
-                        </TableRow>
-                      ))}
+                            </TableCell>
+                            <TableCell>
+                              <div className="flex items-center gap-1">
+                                <span className="text-xs text-slate-500">
+                                  $
+                                </span>
+                                <Input
+                                  type="number"
+                                  value={item.unitPrice}
+                                  onChange={(e) =>
+                                    updateItemPrice(
+                                      item.id,
+                                      Number(e.target.value),
+                                    )
+                                  }
+                                  min="0"
+                                  step="0.01"
+                                  className="w-20 h-8 text-center border-slate-300"
+                                />
+                              </div>
+                            </TableCell>
+                            <TableCell>
+                              <div className="flex items-center gap-1">
+                                <Input
+                                  type="number"
+                                  value={item.discount}
+                                  onChange={(e) =>
+                                    updateItemDiscount(
+                                      item.id,
+                                      Number(e.target.value),
+                                    )
+                                  }
+                                  min="0"
+                                  max="100"
+                                  step="0.1"
+                                  className="w-16 h-8 text-center border-slate-300"
+                                />
+                                <span className="text-xs text-slate-500">%</span>
+                              </div>
+                              {item.discount > 0 && (
+                                <div className="text-xs text-green-600 mt-1">
+                                  -${discountAmount.toFixed(2)}
+                                </div>
+                              )}
+                            </TableCell>
+                            <TableCell>
+                              <div className="font-semibold">
+                                ${item.subtotal.toFixed(2)}
+                              </div>
+                              {item.discount > 0 && (
+                                <div className="text-xs text-slate-500 line-through">
+                                  ${itemTotal.toFixed(2)}
+                                </div>
+                              )}
+                            </TableCell>
+                            <TableCell>
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() =>
+                                  removeItem(item.id)
+                                }
+                                className="h-8 w-8 p-0 border-red-300 text-red-600 hover:bg-red-50"
+                              >
+                                <Trash2 className="h-3 w-3" />
+                              </Button>
+                            </TableCell>
+                          </TableRow>
+                        );
+                      })}
                     </TableBody>
                   </Table>
+                  <div className="p-3 bg-slate-50 text-xs text-slate-600 border-t border-slate-200">
+                    💡 Tip: Puedes modificar cantidades, precios y aplicar descuentos individuales directamente en la tabla
+                  </div>
                 </div>
               )}
             </CardContent>
@@ -577,59 +848,27 @@ export function NewQuote({ onViewChange }: NewQuoteProps) {
           {/* Información adicional */}
           <Card className="border-slate-200 rounded-lg">
             <CardHeader>
-              <CardTitle className="text-slate-800">Información Adicional</CardTitle>
+              <CardTitle className="text-slate-800">Notas</CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
-              <div className="grid grid-cols-3 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="discount" className="text-slate-700">Descuento (%)</Label>
-                  <Input
-                    id="discount"
-                    type="number"
-                    value={formData.discount}
-                    onChange={(e) => handleInputChange('discount', Number(e.target.value))}
-                    min="0"
-                    max="100"
-                    step="0.1"
-                    className="rounded-lg border-slate-300"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="tax" className="text-slate-700">IVA (%)</Label>
-                  <Input
-                    id="tax"
-                    type="number"
-                    value={formData.tax}
-                    onChange={(e) => handleInputChange('tax', Number(e.target.value))}
-                    min="0"
-                    max="100"
-                    step="0.1"
-                    className="rounded-lg border-slate-300"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="validDays" className="text-slate-700">Validez (días)</Label>
-                  <Input
-                    id="validDays"
-                    type="number"
-                    value={formData.validDays}
-                    onChange={(e) => handleInputChange('validDays', Number(e.target.value))}
-                    min="1"
-                    className="rounded-lg border-slate-300"
-                  />
-                </div>
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="notes" className="text-slate-700">Observaciones</Label>
+              <div className="relative">
                 <Textarea
                   id="notes"
-                  value={formData.notes}
-                  onChange={(e) => handleInputChange('notes', e.target.value)}
+                  value={nota}
+                  onChange={(e) => setNota(e.target.value)}
                   placeholder="Condiciones, términos y observaciones especiales..."
-                  className="rounded-lg border-slate-300"
-                  rows={3}
+                  className="rounded-lg border-slate-300 pr-16 pb-8"
+                  maxLength={300}
                 />
+                <span className={`absolute bottom-2 right-2 text-xs px-2 py-1 rounded ${
+                  nota.length > 280 
+                    ? 'text-red-500' 
+                    : nota.length > 250 
+                      ? 'text-amber-500' 
+                      : 'text-slate-400'
+                }`}>
+                  {nota.length}/300
+                </span>
               </div>
             </CardContent>
           </Card>

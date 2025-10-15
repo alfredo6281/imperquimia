@@ -10,13 +10,17 @@ import { Badge } from "./ui/badge";
 import { Pagination, PaginationContent, PaginationItem, PaginationLink, PaginationNext, PaginationPrevious } from "./ui/pagination";
 
 interface MovementRecord {
+  timestamp: string | number | Date;
   id: number;
   productId: string;
   productName: string;
   quantity: number;
+  fecha: string;
   date: string;
+  userName: string;
   type: 'entries' | 'exits';
   userId: string;
+  userRole: string;
 }
 
 interface MovementHistoryProps {
@@ -33,6 +37,7 @@ export function MovementHistory({ onViewChange }: MovementHistoryProps) {
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage] = useState(10);
 
+
   // Usuarios mock
   const users = [
     { id: "1", name: "María González" },
@@ -43,11 +48,32 @@ export function MovementHistory({ onViewChange }: MovementHistoryProps) {
   ];
 
   useEffect(() => {
-    // Cargar movimientos desde localStorage
-    const storedMovements = JSON.parse(localStorage.getItem('inventoryMovements') || '[]');
-    setMovements(storedMovements);
-    setFilteredMovements(storedMovements);
-  }, []);
+  const fetchMovements = async () => {
+    try {
+      const res = await fetch("http://localhost:5000/api/movimiento");
+      const data = await res.json();
+
+      const formatted = data.map((item: any) => ({
+        id: item.idMovimiento,
+        productId: item.idProducto?.toString(),
+        productName: item.nombre || "Desconocido",
+        quantity: item.cantidad,
+        date: item.fecha,
+        type: item.tipo,
+        userName: item.userName || "Usuario desconocido",
+        userRole: item.usuarioRol || "Sin rol",
+        timestamp: item.fecha, // para usar en formatDateTime
+      }));
+
+      setMovements(formatted);
+      setFilteredMovements(formatted);
+    } catch (error) {
+      console.error("Error cargando movimientos:", error);
+    }
+  };
+
+  fetchMovements();
+}, []);
 
   useEffect(() => {
     // Aplicar filtros
@@ -56,8 +82,7 @@ export function MovementHistory({ onViewChange }: MovementHistoryProps) {
     if (searchTerm) {
       filtered = filtered.filter(movement => 
         movement.productName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        movement.userName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        movement.observations?.toLowerCase().includes(searchTerm.toLowerCase())
+        movement.userName?.toLowerCase().includes(searchTerm.toLowerCase())
       );
     }
 
@@ -96,7 +121,7 @@ export function MovementHistory({ onViewChange }: MovementHistoryProps) {
   const exportToCSV = () => {
     const headers = "Fecha,Tipo,Producto,Cantidad,Usuario,Rol,Observaciones\n";
     const csvData = filteredMovements.map(movement => 
-      `${movement.date},${movement.type === 'entries' ? 'Entrada' : 'Salida'},${movement.productName},${movement.quantity},${movement.userName},${movement.userRole},"${movement.observations || ''}"`
+      `${movement.date},${movement.type === 'entries' ? 'Entrada' : 'Salida'},${movement.productName},${movement.quantity},${movement.userName || ''}"`
     ).join('\n');
     
     const blob = new Blob([headers + csvData], { type: 'text/csv' });
@@ -108,20 +133,17 @@ export function MovementHistory({ onViewChange }: MovementHistoryProps) {
   };
 
   const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString('es-ES', {
-      day: '2-digit',
-      month: '2-digit',
-      year: 'numeric'
-    });
+    const dateOnly = dateString.split("T")[0]; // "2022-04-20"
+    const [year, month, day] = dateOnly.split("-");
+    return `${day}/${month}/${year}`;
   };
 
-  const formatDateTime = (timestamp: string) => {
-    return new Date(timestamp).toLocaleString('es-ES', {
-      day: '2-digit',
-      month: '2-digit',
-      year: 'numeric',
+  const formatDateTime = (dateString: string) => {
+    const date = new Date(dateString);
+    return date.toLocaleTimeString('es-ES', {
       hour: '2-digit',
-      minute: '2-digit'
+      minute: '2-digit',
+      hour12: true
     });
   };
 
@@ -161,8 +183,9 @@ export function MovementHistory({ onViewChange }: MovementHistoryProps) {
                 id="search"
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                placeholder="Producto, usuario o notas..."
+                placeholder="Producto"
                 className="rounded-lg border-slate-300"
+                autoComplete="off"
               />
             </div>
             
@@ -264,7 +287,7 @@ export function MovementHistory({ onViewChange }: MovementHistoryProps) {
                           <div className="flex flex-col">
                             <span className="font-medium">{formatDate(movement.date)}</span>
                             <span className="text-sm text-slate-500">
-                              {formatDateTime(movement.timestamp)}
+                              {formatDateTime(movement.timestamp.toString())}
                             </span>
                           </div>
                         </TableCell>

@@ -1,3 +1,16 @@
+// server.js
+import app from "./src/app.js";
+import { connectDB } from "./src/config/db.js";
+
+const PORT = 5000;
+
+const startServer = async () => {
+  await connectDB();
+  app.listen(PORT, () => console.log(`✅ Servidor corriendo en  http://localhost:${PORT}`));
+};
+
+startServer();
+/*
 import express from "express";
 import sql from "mssql";
 import cors from "cors";
@@ -6,14 +19,19 @@ import path from "path";
 import fs from "fs";
 import sharp from "sharp";
 import { fileURLToPath } from "url";
-
+import cotizacionRoutes from "./src/routes/cotizacionRoutes.js";
+import productoRoutes from "./src/routes/productoRoutes.js";
+import customers from "./src/routes/customers.js";
+import pdfRouter from "./src/routes/cotizacionRoutes.js"; // Ajusta la ruta según tu estructura
 const app = express();
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 app.use(cors());
 app.use(express.json());
-
+app.use("/api", productoRoutes);
+app.use("/api", cotizacionRoutes);
+app.use("/api", customers);
 // Configuración de SQL Server
 const dbConfig = {
   user: "imperuser2",
@@ -25,7 +43,8 @@ const dbConfig = {
     trustServerCertificate: true,
   },
 };
-
+// Montar el router de cotizaciones
+app.use(pdfRouter);
 // Carpeta donde se guardarán las imágenes
 const uploadDir = path.join(__dirname, "src/img/Productos");
 if (!fs.existsSync(uploadDir)) {
@@ -61,7 +80,15 @@ app.get("/producto", async (req, res) => {
     res.status(500).send(err.message);
   }
 });
-
+// 📌 Obtener todos los clientes
+app.get("/cliente", async (req, res) => {
+  try {
+    const result = await pool.request().query("SELECT * FROM Cliente");
+    res.json(result.recordset);
+  } catch (err) {
+    res.status(500).send(err.message);
+  }
+});
 // 📌 Crear un nuevo producto
 app.post("/producto", async (req, res) => {
   const {
@@ -149,7 +176,7 @@ app.post("/producto/upload", upload.single("image"), async (req, res) => {
 });
 
 // Endpoint para obtener productos
-app.get("/producto", async (req, res) => {
+/*app.get("/producto", async (req, res) => {
   try {
     let pool = await sql.connect(dbConfig);
     let result = await pool.request().query(`
@@ -221,8 +248,32 @@ app.put("/producto/:id/disminuir-stock", async (req, res) => {
     res.status(500).json({ error: "Error al actualizar stock" });
   }
 });
+
+// 📌 Obtener el Historial de Movimientos
+app.get("/movimiento", async (req, res) => {
+  try {
+    const result = await pool.request().query(`
+      SELECT 
+        m.idMovimiento,
+        m.tipo,
+        m.fecha,
+        p.nombre AS nombre,
+        m.cantidad,
+        u.usuario AS userName
+      FROM movimiento m
+      INNER JOIN Producto p ON m.idProducto = p.idProducto
+      INNER JOIN Usuario u ON m.idUsuario = u.idUsuario
+      ORDER BY m.fecha DESC
+    `);
+
+    res.json(result.recordset);
+  } catch (err) {
+    console.error("Error en /movimiento:", err);
+    res.status(500).send(err.message);
+  }
+});
 app.listen(5000, () => console.log("✅ Servidor corriendo en http://localhost:5000"));
-/*
+
 // 📌 Actualizar producto
 app.put("/productos/:id", async (req, res) => {
     const { id } = req.params;

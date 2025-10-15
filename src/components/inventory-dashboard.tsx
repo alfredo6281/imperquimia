@@ -43,7 +43,7 @@ export function InventoryDashboard({ onViewChange }: InventoryDashboardProps) {
   const [products, setProducts] = useState<Product[]>([]);
 
   useEffect(() => {
-    axios.get("http://localhost:5000/producto")
+    axios.get("http://localhost:5000/api/producto")
       .then((res) => {
         setProducts(res.data);
       })
@@ -98,7 +98,7 @@ export function InventoryDashboard({ onViewChange }: InventoryDashboardProps) {
       formData.append("idProducto", selectedProduct.idProducto.toString());
       formData.append("image", file);
       try {
-      const response = await fetch("http://localhost:5000/producto/upload", {
+      const response = await fetch("http://localhost:5000/api/producto/upload", {
         method: "POST",
         body: formData,
       });

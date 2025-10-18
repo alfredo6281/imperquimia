@@ -264,7 +264,6 @@ export function QuotesHistory({ onViewChange }: QuotesHistoryProps) {
                 <TableHead>Fecha</TableHead>
                 <TableHead>Cliente</TableHead>
                 <TableHead>Total</TableHead>
-                <TableHead>Validez</TableHead>
                 <TableHead>Estado</TableHead>
                 <TableHead>Acciones</TableHead>
               </TableRow>
@@ -281,11 +280,6 @@ export function QuotesHistory({ onViewChange }: QuotesHistoryProps) {
                     <TableCell>{new Date(quote.date).toLocaleDateString()}</TableCell>
                     <TableCell>{quote.clientName}</TableCell>
                     <TableCell className="font-semibold">${quote.total.toFixed(2)}</TableCell>
-                    <TableCell>
-                      <span className={isExpired ? "text-red-600" : "text-green-600"}>
-                        {isExpired ? "Expirada" : `${quote.validDays} días`}
-                      </span>
-                    </TableCell>
                     <TableCell>
                       <Badge className={getStatusColor(quote.status)}>
                         {quote.status}
@@ -353,9 +347,6 @@ export function QuotesHistory({ onViewChange }: QuotesHistoryProps) {
                 </div>
                 <div>
                   <strong>Fecha:</strong> {new Date(selectedQuote.date).toLocaleDateString()}
-                </div>
-                <div>
-                  <strong>Validez:</strong> {selectedQuote.validDays} días
                 </div>
                 <div>
                   <strong>Estado:</strong> 

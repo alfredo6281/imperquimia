@@ -45,6 +45,9 @@ export function NewQuote({ onViewChange }: NewQuoteProps) {
   const [formData, setFormData] = useState({
     clientId: "",
     clientName: "",
+    clientAddress: "",
+    clientPhone: "",
+    clientEmail: "",
     notes: "",
     discount: 0,
     tax: 16,
@@ -64,14 +67,33 @@ export function NewQuote({ onViewChange }: NewQuoteProps) {
     address: ""
   });
 
-  // Datos mock - usando estado para permitir agregar nuevos clientes
-  const [mockClients, setMockClients] = useState([
-    { id: "C001", name: "Constructora ABC S.A.", phone: "555-0101", email: "contacto@abc.com" },
-    { id: "C002", name: "Juan Pérez", phone: "555-0102", email: "juan@email.com" },
-    { id: "C003", name: "Inmobiliaria XYZ", phone: "555-0103", email: "ventas@xyz.com" },
-    { id: "C004", name: "Reparaciones DEF", phone: "555-0104", email: "info@def.com" },
-    { id: "C005", name: "María González", phone: "555-0105", email: "maria@email.com" }
-  ]);
+  const [clients, setClients] = useState<
+    { id: string; name: string; phone: string; email?: string; address?: string }[]
+  >([]);
+  // cargar clientes desde la API al montar
+  useEffect(() => {
+    const loadClients = async () => {
+      try {
+        const res = await fetch("http://localhost:5000/api/cliente");
+        if (!res.ok) throw new Error("Error cargando clientes");
+        const data = await res.json();
+        // mapea los campos del backend (idCliente, nombre, telefono, correo, direccion)
+        const mapped = data.map((c: { idCliente: any; id: any; nombre: any; name: any; telefono: any; phone: any; correo: any; email: any; domicilio: any; address: any; }) => ({
+          id: String(c.idCliente ?? c.id ?? c.idCliente),
+          name: c.nombre ?? c.name,
+          phone: c.telefono ?? c.phone ?? "",
+          email: c.correo ?? c.email ?? "",
+          address: c.domicilio ?? c.address ?? "",
+        }));
+        setClients(mapped);
+      } catch (err) {
+        console.error("Error cargando clientes:", err);
+        toast.error("No se pudieron cargar los clientes");
+      }
+    };
+
+    loadClients();
+  }, []);
 
   const [products, setProducts] = useState<Product[]>([]);
 
@@ -84,10 +106,10 @@ export function NewQuote({ onViewChange }: NewQuoteProps) {
 
 
   // Filtrar clientes por término de búsqueda
-  const filteredClients = mockClients.filter(client =>
+  const filteredClients = clients.filter(client =>
     client.name.toLowerCase().includes(clientSearchTerm.toLowerCase()) ||
     client.phone.includes(clientSearchTerm) ||
-    client.email.toLowerCase().includes(clientSearchTerm.toLowerCase())
+    client.email?.toLowerCase().includes(clientSearchTerm.toLowerCase())
   );
 
   // Filtrar productos por término de búsqueda
@@ -110,47 +132,68 @@ export function NewQuote({ onViewChange }: NewQuoteProps) {
     }));
   };
 
-  const addNewClient = () => {
+  const addNewClient = async () => {
     if (!newClientData.name.trim() || !newClientData.phone.trim()) {
       toast.error("Nombre y teléfono son campos obligatorios");
       return;
     }
 
-    const existingClient = mockClients.find(client => 
-      client.name.toLowerCase() === newClientData.name.trim().toLowerCase()
-    );
-    if (existingClient) {
-      toast.error("Ya existe un cliente con ese nombre");
-      return;
+    try {
+      // petición al servidor
+      const res = await fetch("http://localhost:5000/api/cliente", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          nombre: newClientData.name.trim(),
+          telefono: newClientData.phone.trim(),
+          correo: newClientData.email.trim() || null,
+          domicilio: newClientData.address.trim() || null,
+        }),
+      });
+
+      if (!res.ok) {
+        const text = await res.text();
+        console.error("Error al crear cliente:", text);
+        throw new Error("Error creando cliente");
+      }
+
+      const data = await res.json();
+      // el backend devuelve { idCliente } según el controller que te dí
+      const newId = String(data.idCliente ?? data.id ?? `C${Date.now()}`);
+
+      const newClient = {
+        id: newId,
+        name: newClientData.name.trim(),
+        phone: newClientData.phone.trim(),
+        email: newClientData.email.trim() || "",
+        address: newClientData.address.trim() || "",
+      };
+
+      // actualiza estado local
+      setClients(prev => [...prev, newClient]);
+      setFormData(prev => ({ ...prev, clientId: newClient.id, clientName: newClient.name, 
+        clientPhone: newClient.phone, clientAddress: newClient.address, clientEmail: newClient.email }));
+
+      // limpiar UI
+      setNewClientData({ name: "", phone: "", email: "", address: "" });
+      setShowNewClientModal(false);
+      setClientSearchTerm("");
+      toast.success("Cliente agregado y seleccionado exitosamente");
+    } catch (err) {
+      console.error(err);
+      toast.error("No se pudo crear el cliente");
     }
-
-    const newId = `C${String(mockClients.length + 1).padStart(3, '0')}`;
-    const newClient = {
-      id: newId,
-      name: newClientData.name.trim(),
-      phone: newClientData.phone.trim(),
-      address: newClientData.address.trim(),
-      email: newClientData.email.trim() || ""
-    };
-
-    setMockClients(prev => [...prev, newClient]);
-    setFormData(prev => ({
-      ...prev,
-      clientId: newId,
-      clientName: newClient.name
-    }));
-
-    setNewClientData({ name: "", phone: "", email: "", address: "" });
-    setShowNewClientModal(false);
-    setClientSearchTerm("");
-    toast.success("Cliente agregado y seleccionado exitosamente");
   };
+
 
   const handleClientSelect = (client: any) => {
     setFormData(prev => ({
       ...prev,
       clientId: client.id,
-      clientName: client.name
+      clientName: client.name,
+      clientAddress: client.address,
+      clientPhone: client.phone,
+      clientEmail: client.email
     }));
     setClientSearchTerm(""); // Limpiar búsqueda al seleccionar
   };
@@ -277,8 +320,11 @@ export function NewQuote({ onViewChange }: NewQuoteProps) {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          numero: 123,
+          numero: formData.clientId,
           cliente: formData.clientName,
+          domicilio: formData.clientAddress,
+          telefono: formData.clientPhone,
+          correo: formData.clientEmail,
           productos: items.map(item => ({
             codigo: item.productId,
             nombre: item.productName,
@@ -396,7 +442,7 @@ export function NewQuote({ onViewChange }: NewQuoteProps) {
     }, 1000);
   };
 
-  const selectedClient = mockClients.find(c => c.id === formData.clientId);
+  const selectedClient = clients.find(c => c.id === formData.clientId);
 
   return (
     <div className="flex-1 p-6">
@@ -449,6 +495,7 @@ export function NewQuote({ onViewChange }: NewQuoteProps) {
                       type="button"
                       variant="outline"
                       size="sm"
+                      
                       onClick={() => {
                         setFormData((prev) => ({
                           ...prev,
@@ -600,6 +647,7 @@ export function NewQuote({ onViewChange }: NewQuoteProps) {
                       }
                       placeholder="Buscar por nombre, teléfono o email..."
                       className="pl-10 rounded-lg border-slate-300"
+                      autoComplete="off"
                     />
                   </div>
 
@@ -654,6 +702,7 @@ export function NewQuote({ onViewChange }: NewQuoteProps) {
                     onChange={(e) => setProductSearchTerm(e.target.value)}
                     placeholder="Buscar por nombre o categoría..."
                     className="pl-10 rounded-lg border-slate-300"
+                    autoComplete="off"
                   />
                 </div>
                 {productSearchTerm && filteredProducts.length > 0 && (
@@ -667,7 +716,7 @@ export function NewQuote({ onViewChange }: NewQuoteProps) {
                         }}
                         className="p-3 hover:bg-slate-50 cursor-pointer border-b border-slate-100 last:border-b-0"
                       >
-                        <div className="font-medium text-slate-800">{product.nombre}</div>
+                        <div className="font-medium text-slate-800">{product.nombre} - {product.tipo}: {product.unidad} {product.unidadMedida} {product.color}</div>
                         <div className="text-sm text-slate-600">${product.precioUnitario} • Stock: {product.stock} • {product.categoria}</div>
                       </div>
                     ))}
@@ -686,7 +735,7 @@ export function NewQuote({ onViewChange }: NewQuoteProps) {
                       {products.map((product) => (
                         <SelectItem key={product.idProducto} value={product.idProducto.toString()}>
                           <div className="flex flex-col">
-                            <span className="font-medium">{product.nombre}</span>
+                            <span className="font-medium">{product.nombre} - {product.tipo}: {product.unidad} {product.unidadMedida} {product.color}</span>
                             <span className="text-sm text-slate-500">
                               ${product.precioUnitario} • Stock: {product.stock} • {product.categoria}
                             </span>
@@ -750,7 +799,7 @@ export function NewQuote({ onViewChange }: NewQuoteProps) {
                         return (
                           <TableRow key={item.id}>
                             <TableCell className="font-medium">
-                              {item.productName}
+                              {item.productName} {item.unity} {item.unitMed} {item.color}
                             </TableCell>
                             <TableCell>
                               <Input

@@ -32,9 +32,6 @@ export const createCliente = async (req, res) => {
   }
 };
 
-
-
-
 export const deleteCliente = async (req, res) => {
   const { id } = req.params;
   try {
@@ -48,3 +45,7 @@ export const deleteCliente = async (req, res) => {
     res.status(500).json({ error: "Error al eliminar cliente" });
   }
 };
+
+export const editCliente = async (req, res) => {
+  
+}

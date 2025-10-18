@@ -29,7 +29,7 @@ const printer = new PdfPrinter(fonts);
 //router.post("/api/cotizacion/pdf", async (req, res) => {
 export const createPdf = async (req, res) => {
   try {
-    const { numero, cliente, telefono, correo, direccion, productos, subtotal, iva, total, date, nota } = req.body;
+    const { numero, cliente, telefono, correo, domicilio, productos, subtotal, iva, total, date, nota } = req.body;
 
     // Ruta donde se guardará
     //const folderPath = path.join(process.cwd(), "src/pdf/cotizaciones");
@@ -159,7 +159,7 @@ export const createPdf = async (req, res) => {
                   stack:[
                     { text: [{ text: "Cliente: ", bold: true}, {text: `${numero}`}], style: "subheader"},
                     { text: [{ text: "Nombre: ", bold: true}, {text: `${cliente}`}], fontSize: 11},
-                    { text: [{ text: "Dirección: ", bold: true}, {text: `${direccion}`}], style: "subheader"},
+                    { text: [{ text: "Dirección: ", bold: true}, {text: `${domicilio}`}], style: "subheader"},
                   ]
                 },
                 {

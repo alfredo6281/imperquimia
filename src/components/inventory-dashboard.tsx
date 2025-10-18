@@ -36,7 +36,7 @@ export function InventoryDashboard({ onViewChange }: InventoryDashboardProps) {
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
   const [isViewModalOpen, setIsViewModalOpen] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
-  const [itemsPerPage] = useState(4);
+  const [itemsPerPage] = useState(5);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Datos mock del inventario
@@ -219,9 +219,6 @@ export function InventoryDashboard({ onViewChange }: InventoryDashboardProps) {
       <Card className="border-slate-200 rounded-lg h-[50px] gap-1">
         <CardHeader>
           <CardTitle className="text-slate-800 font-bold">Productos en Inventario</CardTitle>
-          <CardDescription className="text-slate-600">
-            Lista completa de productos
-          </CardDescription>
         </CardHeader>
         <CardContent>
           <ScrollArea className="h-[500px] w-full">

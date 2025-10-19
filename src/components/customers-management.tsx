@@ -5,18 +5,19 @@ import { Input } from "./ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "./ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "./ui/table";
 import { Badge } from "./ui/badge";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "./ui/select";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "./ui/dialog";
-import { Pagination, PaginationContent, PaginationEllipsis, PaginationItem, PaginationLink, PaginationNext, PaginationPrevious } from "./ui/pagination";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle} from "./ui/alert-dialog";
 import { Label } from "./ui/label";
+import PaginationControls from "./common/paginationControls";
 import axios from "axios";
 import { toast } from "sonner";
 
 interface Customer {
-  idCliente: string;
+  idCliente: number;
   nombre: string;
-  type: string;
-  contact: string;
+  tipo: string;
+  contacto: string;
   telefono: string;
   correo: string;
   domicilio: string;
@@ -40,13 +41,12 @@ export function CustomersManagement({ onViewChange }: CustomersManagementProps) 
   const [editFormData, setEditFormData] = useState<Customer | null>(null);
   const [newClientData, setNewClientData] = useState({
     nombre: "",
-    tipo: "Personal" as string,
+    tipo: "",
     contacto: "",
     telefono: "",
     correo: "",
     domicilio: "",
   });
-
   // Datos mock del inventario
   const [customers, setCustomers] = useState<Customer[]>([]);
 
@@ -60,11 +60,23 @@ export function CustomersManagement({ onViewChange }: CustomersManagementProps) 
       });
   }, []);
 
-  const filteredCustomers = customers.filter(customer =>
-    customer.nombre.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    customer.idCliente.toLowerCase().includes(searchTerm.toLowerCase()) //||
-    //product.idProducto.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  const q = searchTerm.trim().toLowerCase();
+  const filteredCustomers = customers.filter((customer) => {
+    // Normalizar y proteger campos que pueden ser undefined o number
+    const nombre = String(customer.nombre ?? "").toLowerCase();
+    const id = String(customer.idCliente ?? "").toLowerCase();
+
+    // soportar tanto customer.contact como customer.contacto (por inconsistencia)
+    const contacto = String((customer as any).contact ?? (customer as any).contacto ?? "").toLowerCase();
+    const correo = String(customer.correo ?? "").toLowerCase();
+
+    return (
+      nombre.includes(q) ||
+      id.includes(q) ||
+      contacto.includes(q) ||
+      correo.includes(q)
+    );
+  });
 
   // Cálculos para paginación
   const totalPages = Math.ceil(filteredCustomers.length / itemsPerPage);
@@ -89,19 +101,47 @@ export function CustomersManagement({ onViewChange }: CustomersManagementProps) 
     setEditDetailsOpen(true);
   };
 
-  const handleSaveEdit = () => {
-    if (editFormData) {
-      setCustomers(
-        customers.map((c) =>
+  const handleSaveEdit = async () => {
+    if (!editFormData) return;
+
+    try {
+      const response = await fetch(`http://localhost:5000/api/cliente/${editFormData.idCliente}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          nombre: editFormData.nombre,
+          contacto: editFormData.tipo === "Personal" ? null : editFormData.contacto,
+          telefono: editFormData.telefono,
+          correo: editFormData.correo,
+          domicilio: editFormData.domicilio,
+          tipo: editFormData.tipo,
+        }),
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error("Error del servidor:", errorText);
+        toast.error("Error al actualizar el cliente");
+        return;
+      }
+
+      // ✅ Si todo salió bien, actualizamos el estado local
+      setCustomers((prev) =>
+        prev.map((c) =>
           c.idCliente === editFormData.idCliente ? editFormData : c,
-        ),
+        )
       );
+
       toast.success("Cliente actualizado correctamente");
       setEditDetailsOpen(false);
       setEditFormData(null);
       setSelectedCustomer(null);
+    } catch (err) {
+      console.error("❌ Error al guardar cambios:", err);
+      toast.error("No se pudo conectar con el servidor");
     }
   };
+
 
   const handleDeleteClick = (customer: Customer) => {
     setSelectedCustomer(customer);
@@ -119,7 +159,7 @@ export function CustomersManagement({ onViewChange }: CustomersManagementProps) 
         method: "DELETE",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          idCliente: parseInt(selectedCustomer.idCliente, 10),
+          idCliente: parseInt(selectedCustomer.idCliente.toString(), 10),
         }),
         });
         
@@ -145,64 +185,96 @@ export function CustomersManagement({ onViewChange }: CustomersManagementProps) 
       [field]: value,
     }));
   };
+  
+  const handleNewTypeChange = (value: string) => {
+    setNewClientData(prev => ({
+      ...prev,
+      tipo: value,
+      // si es Personal limpiamos el contacto local para no mantener valores viejos
+      contacto: value === "Personal" ? "" : prev.contacto,
+    }));
+  };
 
   const handleCreateClient = async () => {
     if (!newClientData.nombre.trim()) {
       toast.error("El nombre es obligatorio");
       return;
     }
-
     if (!newClientData.telefono.trim()) {
       toast.error("El teléfono es obligatorio");
       return;
     }
 
-    const existingClient = customers.find(
-      (client) =>
-        client.nombre.toLowerCase() ===
-        newClientData.nombre.trim().toLowerCase(),
+    // Previene duplicados por nombre (cliente local)
+    const exists = customers.some(
+      (c) => c.nombre.toLowerCase() === newClientData.nombre.trim().toLowerCase()
     );
-    if (existingClient) {
+    if (exists) {
       toast.error("Ya existe un cliente con ese nombre");
       return;
     }
-    try{
-      //const newId = `CLI-${String(customers.length + 1).padStart(3, "0")}`;
-      const newClient = await fetch("http://localhost:5000/api/cliente", {
+
+    try {
+      // POST para crear
+      const response = await fetch("http://localhost:5000/api/cliente", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           nombre: newClientData.nombre,
-          contacto: newClientData.nombre,
+          contacto: newClientData.tipo === "Personal" ? null : (newClientData.contacto),
           telefono: newClientData.telefono,
           correo: newClientData.correo,
           domicilio: newClientData.domicilio,
+          tipo: newClientData.tipo,
         }),
       });
-      console.log("Respuesta del servidor:", newClient);
-      
+
+      // Log para inspeccionar exactamente lo que devuelve el servidor
+      const raw = await (async () => {
+        try {
+          return await response.clone().json();
+        } catch {
+          return await response.clone().text();
+        }
+      })();
+      console.log("POST /api/cliente -> status:", response.status, "body:", raw);
+
+      if (!response.ok) {
+        // mostrar mensaje más detallado si el servidor lo envía
+        const errText = typeof raw === "string" ? raw : JSON.stringify(raw);
+        console.error("Error al crear el cliente (server):", errText);
+        toast.error("Error al crear el cliente");
+        return;
+      }
+
+      // ✅ Ahora hacemos un refetch de la lista completa (garantiza que el front muestre la forma real)
+      const listRes = await axios.get("http://localhost:5000/api/cliente");
+      const list = listRes.data ?? [];
+      setCustomers(list);
+
+      // ajustar la página para que muestre el nuevo registro (ir a la última página)
+      const newTotal = list.length;
+      const newPage = Math.max(1, Math.ceil(newTotal / itemsPerPage));
+      setCurrentPage(newPage);
+
       toast.success("Cliente creado exitosamente");
 
       // Limpiar formulario y cerrar modal
       setNewClientData({
         nombre: "",
-        tipo: "Personal",
+        tipo: "",
         contacto: "",
         telefono: "",
         correo: "",
         domicilio: "",
       });
-      
       setNewClientOpen(false);
-      
-    
-    }catch (error) {
-      console.error("Error detallado:", error);
-      toast.error("Hubo un problema al guardar el producto: ");
+    } catch (error) {
+      console.error("Error creando cliente:", error);
+      toast.error("Hubo un problema al guardar el cliente");
     }
-    
-    
   };
+
 
   const getTypeColor = (type: string) => {
     switch (type) {
@@ -258,6 +330,30 @@ export function CustomersManagement({ onViewChange }: CustomersManagementProps) 
         </div>
       </div>
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
       {/* Tabla de clientes */}
       <Card className="border-slate-200 rounded-lg gap-1">
         <CardHeader>
@@ -273,8 +369,6 @@ export function CustomersManagement({ onViewChange }: CustomersManagementProps) 
                 <TableHead>Tipo</TableHead>
                 <TableHead>Contacto</TableHead>
                 <TableHead>Información</TableHead>
-                <TableHead>Total Compras</TableHead>
-                <TableHead>Última Compra</TableHead>
                 <TableHead>Acciones</TableHead>
               </TableRow>
             </TableHeader>
@@ -293,15 +387,15 @@ export function CustomersManagement({ onViewChange }: CustomersManagementProps) 
                   </TableCell>
                   <TableCell>
                     <Badge
-                      className={getTypeColor(customer.type)}
+                      className={getTypeColor(customer.tipo)}
                     >
-                      {customer.type}
+                      {customer.tipo}
                     </Badge>
                   </TableCell>
                   <TableCell>
                     <div className="space-y-1">
                       <div className="text-sm font-medium">
-                        {customer.contact}
+                        {customer.contacto ?? "-"}
                       </div>
                       <div className="flex items-center gap-1 text-xs text-slate-500">
                         <Phone className="h-3 w-3" />
@@ -317,17 +411,9 @@ export function CustomersManagement({ onViewChange }: CustomersManagementProps) 
                       </div>
                       <div className="flex items-center gap-1 text-xs text-slate-500">
                         <MapPin className="h-3 w-3" />
-                        {customer.domicilio.substring(0, 25)}...
+                        {(customer.domicilio ?? "").length > 25 ? `${(customer.domicilio ?? "").substring(0,25)}...` : (customer.domicilio ?? "-")}
                       </div>
                     </div>
-                  </TableCell>
-                  <TableCell className="font-semibold text-green-600">
-                    ${/*customer.totalPurchases.toFixed(2)*/}
-                  </TableCell>
-                  <TableCell>
-                    {new Date(
-                      customer.lastPurchase,
-                    ).toLocaleDateString()}
                   </TableCell>
                   <TableCell>
                     <div className="flex gap-2">
@@ -368,63 +454,46 @@ export function CustomersManagement({ onViewChange }: CustomersManagementProps) 
             </TableBody>
           </Table>
           {/* Información de paginación y controles */}
-          {totalPages > 1 && (
-            <div className="flex items-center justify-between space-x-2 py-4">
-              <div className="text-sm text-slate-600">
-                Mostrando {startIndex + 1} a {Math.min(endIndex, filteredCustomers.length)} de {filteredCustomers.length} clientes
-              </div>
-              <Pagination>
-                <PaginationContent>
-                  <PaginationItem>
-                    <PaginationPrevious 
-                      onClick={() => setCurrentPage(Math.max(1, currentPage - 1))}
-                      className={currentPage === 1 ? "pointer-events-none opacity-50" : "cursor-pointer"}
-                    />
-                  </PaginationItem>
-                  
-                  {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
-                    let pageNumber;
-                    if (totalPages <= 5) {
-                      pageNumber = i + 1;
-                    } else if (currentPage <= 3) {
-                      pageNumber = i + 1;
-                    } else if (currentPage >= totalPages - 2) {
-                      pageNumber = totalPages - 4 + i;
-                    } else {
-                      pageNumber = currentPage - 2 + i;
-                    }
-                    
-                    return (
-                      <PaginationItem key={pageNumber}>
-                        <PaginationLink
-                          onClick={() => setCurrentPage(pageNumber)}
-                          isActive={currentPage === pageNumber}
-                          className="cursor-pointer"
-                        >
-                          {pageNumber}
-                        </PaginationLink>
-                      </PaginationItem>
-                    );
-                  })}
-                  
-                  {totalPages > 5 && currentPage < totalPages - 2 && (
-                    <PaginationItem>
-                      <PaginationEllipsis />
-                    </PaginationItem>
-                  )}
-                  
-                  <PaginationItem>
-                    <PaginationNext 
-                      onClick={() => setCurrentPage(Math.min(totalPages, currentPage + 1))}
-                      className={currentPage === totalPages ? "pointer-events-none opacity-50" : "cursor-pointer"}
-                    />
-                  </PaginationItem>
-                </PaginationContent>
-              </Pagination>
-            </div>
+          {filteredCustomers.length > 0 && (
+            <PaginationControls
+              totalItems={filteredCustomers.length}
+              currentPage={currentPage}
+              itemsPerPage={itemsPerPage}
+              onPageChange={(p) => setCurrentPage(p)}
+              maxButtons={5} 
+              labelPrefix="Mostrando"
+            />
           )}
         </CardContent>
       </Card>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
       {/* Modal de Ver Detalles */}
       <Dialog
@@ -456,10 +525,10 @@ export function CustomersManagement({ onViewChange }: CustomersManagementProps) 
                 </Label>
                 <Badge
                   className={getTypeColor(
-                    selectedCustomer.type,
+                    selectedCustomer.tipo,
                   )}
                 >
-                  {selectedCustomer.type}
+                  {selectedCustomer.tipo}
                 </Badge>
               </div>
               <div className="space-y-2 col-span-2">
@@ -475,7 +544,7 @@ export function CustomersManagement({ onViewChange }: CustomersManagementProps) 
                   Persona de Contacto
                 </Label>
                 <p className="text-slate-900">
-                  {selectedCustomer.contact}
+                  {selectedCustomer.contacto ?? "-"}
                 </p>
               </div>
               <div className="space-y-2">
@@ -505,28 +574,8 @@ export function CustomersManagement({ onViewChange }: CustomersManagementProps) 
                   {selectedCustomer.domicilio}
                 </div>
               </div>
-              <div className="space-y-2">
-                <Label className="text-slate-700">
-                  Total de Compras
-                </Label>
-                <p className="text-green-600">
-                  ${/*selectedCustomer.totalPurchases.toFixed(2)*/}
-                </p>
-              </div>
-              <div className="space-y-2">
-                <Label className="text-slate-700">
-                  Última Compra
-                </Label>
-                <p className="text-slate-900">
-                  {new Date(
-                    selectedCustomer.lastPurchase,
-                  ).toLocaleDateString("es-MX", {
-                    year: "numeric",
-                    month: "long",
-                    day: "numeric",
-                  })}
-                </p>
-              </div>
+              
+              
               
             </div>
           )}
@@ -541,6 +590,30 @@ export function CustomersManagement({ onViewChange }: CustomersManagementProps) 
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
       {/* Modal de Editar Detalles */}
       <Dialog
@@ -574,31 +647,28 @@ export function CustomersManagement({ onViewChange }: CustomersManagementProps) 
                       nombre: e.target.value,
                     })
                   }
+                  autoComplete="off"
                   className="rounded-lg border-slate-300"
                 />
               </div>
               <div className="space-y-2">
-                <Label
-                  htmlFor="edit-type"
-                  className="text-slate-700"
+                <Label htmlFor="edit-type" className="text-slate-700">Tipo</Label>
+                <Select
+                  value={editFormData.tipo}
+                  onValueChange={(value) => setEditFormData((prev) =>
+                    prev ? { ...prev, tipo: value, contacto: value === "Personal" ? "" : prev.contacto } : prev
+                  )}
                 >
-                  Tipo de Cliente
-                </Label>
-                <select
-                  id="edit-type"
-                  value={editFormData.type}
-                  onChange={(e) =>
-                    setEditFormData({
-                      ...editFormData,
-                      type: e.target.value,
-                    })
-                  }
-                  className="w-full rounded-lg border border-slate-300 px-3 py-2 bg-white text-slate-900"
-                >
-                  <option value="Empresa">Empresa</option>
-                  <option value="Personal">Personal</option>
-                </select>
+                  <SelectTrigger className="rounded-lg border-slate-300">
+                    <SelectValue placeholder="Personal o Empresa" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="Personal">Personal</SelectItem>
+                    <SelectItem value="Empresa">Empresa</SelectItem>
+                  </SelectContent>
+                </Select>
               </div>
+
               <div className="space-y-2">
                 <Label
                   htmlFor="edit-contact"
@@ -608,13 +678,15 @@ export function CustomersManagement({ onViewChange }: CustomersManagementProps) 
                 </Label>
                 <Input
                   id="edit-contact"
-                  value={editFormData.contact}
+                  value={editFormData.contacto}
                   onChange={(e) =>
                     setEditFormData({
                       ...editFormData,
-                      contact: e.target.value,
+                      contacto: e.target.value,
                     })
                   }
+                  autoComplete="off"
+                  disabled={editFormData.tipo === "Personal"}
                   className="rounded-lg border-slate-300"
                 />
               </div>
@@ -634,6 +706,8 @@ export function CustomersManagement({ onViewChange }: CustomersManagementProps) 
                       telefono: e.target.value,
                     })
                   }
+                  type="number"
+                  autoComplete="off"
                   className="rounded-lg border-slate-300"
                 />
               </div>
@@ -647,13 +721,14 @@ export function CustomersManagement({ onViewChange }: CustomersManagementProps) 
                 <Input
                   id="edit-email"
                   type="email"
-                  value={editFormData.telefono}
+                  value={editFormData.correo}
                   onChange={(e) =>
                     setEditFormData({
                       ...editFormData,
-                      telefono: e.target.value,
+                      correo: e.target.value,
                     })
                   }
+                  autoComplete="off"
                   className="rounded-lg border-slate-300"
                 />
               </div>
@@ -666,23 +741,16 @@ export function CustomersManagement({ onViewChange }: CustomersManagementProps) 
                 </Label>
                 <Input
                   id="edit-address"
-                  value={editFormData.telefono}
+                  value={editFormData.domicilio}
                   onChange={(e) =>
                     setEditFormData({
                       ...editFormData,
-                      telefono: e.target.value,
+                      domicilio: e.target.value,
                     })
                   }
+                  autoComplete="off"
                   className="rounded-lg border-slate-300"
                 />
-              </div>
-              <div className="space-y-2">
-                <Label
-                  htmlFor="edit-status"
-                  className="text-slate-700"
-                >
-                  Estado
-                </Label>
               </div>
             </div>
           )}
@@ -703,6 +771,31 @@ export function CustomersManagement({ onViewChange }: CustomersManagementProps) 
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
       {/* Modal de Crear Nuevo Cliente */}
       <Dialog
@@ -736,32 +829,27 @@ export function CustomersManagement({ onViewChange }: CustomersManagementProps) 
                     e.target.value,
                   )
                 }
+                autoComplete="off"
                 placeholder="Ej: Juan Pérez o Constructora ABC S.A."
                 className="rounded-lg border-slate-300"
               />
             </div>
+            
             <div className="space-y-2">
-              <Label
-                htmlFor="new-type"
-                className="text-slate-700"
-              >
-                Tipo de Cliente *
-              </Label>
-              <select
-                id="new-type"
-                value={newClientData.tipo}
-                onChange={(e) =>
-                  handleNewClientInputChange(
-                    "tipo",
-                    e.target.value,
-                  )
-                }
-                className="w-full rounded-lg border border-slate-300 px-3 py-2 bg-white text-slate-900"
-              >
-                <option value="Personal">Personal</option>
-                <option value="Empresa">Empresa</option>
-              </select>
-            </div>
+                <Label htmlFor="new-type"  className="text-slate-700">Tipo de Cliente *</Label>
+                <Select
+                  value={newClientData.tipo}
+                  onValueChange={(value) => handleNewTypeChange(value)}
+                >
+                  <SelectTrigger className="rounded-lg border-slate-300">
+                    <SelectValue placeholder="Selecciona tipo" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="Personal">Personal</SelectItem>
+                    <SelectItem value="Empresa">Empresa</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
             <div className="space-y-2">
               <Label
                 htmlFor="new-contact"
@@ -778,6 +866,8 @@ export function CustomersManagement({ onViewChange }: CustomersManagementProps) 
                     e.target.value,
                   )
                 }
+                autoComplete="off"
+                disabled={newClientData.tipo === "Personal"}
                 placeholder="Nombre del contacto"
                 className="rounded-lg border-slate-300"
               />
@@ -801,6 +891,8 @@ export function CustomersManagement({ onViewChange }: CustomersManagementProps) 
                     e.target.value,
                   )
                 }
+                type="number"
+                autoComplete="off"
                 placeholder="+52 555-0123"
                 className="rounded-lg border-slate-300"
               />
@@ -822,6 +914,7 @@ export function CustomersManagement({ onViewChange }: CustomersManagementProps) 
                     e.target.value,
                   )
                 }
+                autoComplete="off"
                 placeholder="cliente@email.com"
                 className="rounded-lg border-slate-300"
               />
@@ -842,6 +935,7 @@ export function CustomersManagement({ onViewChange }: CustomersManagementProps) 
                     e.target.value,
                   )
                 }
+                autoComplete="off"
                 placeholder="Calle, número, colonia, ciudad"
                 className="rounded-lg border-slate-300"
               />
@@ -875,6 +969,33 @@ export function CustomersManagement({ onViewChange }: CustomersManagementProps) 
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
       {/* Alert Dialog de Confirmar Eliminación */}
       <AlertDialog

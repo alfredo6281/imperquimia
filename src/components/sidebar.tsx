@@ -31,8 +31,13 @@ export function Sidebar({ activeView, onViewChange }: SidebarProps) {
   return (
     <div className="w-64 bg-slate-50 border-r border-slate-200 h-full flex flex-col">
       <div className="p-6 border-b border-slate-200">
+        <img 
+          src="./src/img/marca.png"
+        />
+        {/*
         <h1 className="text-blue-800 font-semibold text-lg">Control de Inventario</h1>
         <p className="text-slate-600 text-sm">Impermeabilizantes</p>
+        */}
       </div>
       
       <nav className="flex-1 p-4">

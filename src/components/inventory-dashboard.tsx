@@ -7,7 +7,7 @@ import { Badge } from "./ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "./ui/card";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "./ui/dialog";
 import { ScrollArea } from "./ui/scroll-area";
-import { Pagination, PaginationContent, PaginationEllipsis, PaginationItem, PaginationLink, PaginationNext, PaginationPrevious } from "./ui/pagination";
+import PaginationControls from "./common/paginationControls";
 import { ImageWithFallback } from "./figma/ImageWithFallback";
 import axios from "axios";
 import { toast } from "sonner";
@@ -266,60 +266,15 @@ export function InventoryDashboard({ onViewChange }: InventoryDashboardProps) {
           </ScrollArea>
           
           {/* Información de paginación y controles */}
-          {totalPages > 1 && (
-            <div className="flex items-center justify-between space-x-2 py-4">
-              <div className="text-sm text-slate-600">
-                Mostrando {startIndex + 1} a {Math.min(endIndex, filteredProducts.length)} de {filteredProducts.length} productos
-              </div>
-              <Pagination>
-                <PaginationContent>
-                  <PaginationItem>
-                    <PaginationPrevious 
-                      onClick={() => setCurrentPage(Math.max(1, currentPage - 1))}
-                      className={currentPage === 1 ? "pointer-events-none opacity-50" : "cursor-pointer"}
-                    />
-                  </PaginationItem>
-                  
-                  {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
-                    let pageNumber;
-                    if (totalPages <= 5) {
-                      pageNumber = i + 1;
-                    } else if (currentPage <= 3) {
-                      pageNumber = i + 1;
-                    } else if (currentPage >= totalPages - 2) {
-                      pageNumber = totalPages - 4 + i;
-                    } else {
-                      pageNumber = currentPage - 2 + i;
-                    }
-                    
-                    return (
-                      <PaginationItem key={pageNumber}>
-                        <PaginationLink
-                          onClick={() => setCurrentPage(pageNumber)}
-                          isActive={currentPage === pageNumber}
-                          className="cursor-pointer"
-                        >
-                          {pageNumber}
-                        </PaginationLink>
-                      </PaginationItem>
-                    );
-                  })}
-                  
-                  {totalPages > 5 && currentPage < totalPages - 2 && (
-                    <PaginationItem>
-                      <PaginationEllipsis />
-                    </PaginationItem>
-                  )}
-                  
-                  <PaginationItem>
-                    <PaginationNext 
-                      onClick={() => setCurrentPage(Math.min(totalPages, currentPage + 1))}
-                      className={currentPage === totalPages ? "pointer-events-none opacity-50" : "cursor-pointer"}
-                    />
-                  </PaginationItem>
-                </PaginationContent>
-              </Pagination>
-            </div>
+          {filteredProducts.length > 0 && (
+            <PaginationControls
+              totalItems={filteredProducts.length}
+              currentPage={currentPage}
+              itemsPerPage={itemsPerPage}
+              onPageChange={(p) => setCurrentPage(p)}
+              maxButtons={4} 
+              labelPrefix="Mostrando"
+            />
           )}
         </CardContent>
       </Card>

@@ -2,9 +2,10 @@ import { pool, sql } from "../config/db.js";
 
 export const getCliente = async (req, res) => {
   try {
-    const result = await pool.request().query("SELECT * FROM Cliente");
+    const result = await pool.request().query("SELECT * FROM Cliente ORDER BY idCliente");
     res.json(result.recordset);
   } catch (err) {
+    console.error("Error getCliente:", err);
     res.status(500).send(err.message);
   }
 };
@@ -25,24 +26,23 @@ export const deleteCliente = async (req, res) => {
 
 export const createCliente = async (req, res) => {
   const { nombre, domicilio, telefono, correo, tipo, contacto } = req.body;
-
   try {
-    const result = await pool
-      .request()
+    const request = pool.request()
       .input("nombre", sql.NVarChar(50), nombre)
-      .input("contacto", sql.NVarChar(50), contacto)
-      .input("telefono", sql.NVarChar(10), telefono)
-      .input("correo", sql.NVarChar(30), correo)
-      .input("domicilio", sql.NVarChar(100), domicilio)
-      .input("tipo", sql.NVarChar(8), tipo)
-      .query(`
-        INSERT INTO Cliente (nombre, contacto, telefono, correo, domicilio, tipo)
-        OUTPUT INSERTED.idCliente
-        VALUES (@nombre, @contacto, @telefono, @correo, @domicilio, @tipo)
-      `);
+      .input("contacto", sql.NVarChar(50), contacto ?? null)
+      .input("telefono", sql.NVarChar(10), telefono ?? null)
+      .input("correo", sql.NVarChar(30), correo ?? null)
+      .input("domicilio", sql.NVarChar(100), domicilio ?? null)
+      .input("tipo", sql.NVarChar(8), tipo ?? null);
 
-    const idCliente = result.recordset[0].idCliente;
-    res.status(201).json({ message: "Cliente agregado correctamente", idCliente });
+    const result = await request.query(`
+      INSERT INTO Cliente (nombre, contacto, telefono, correo, domicilio, tipo)
+      OUTPUT INSERTED.*
+      VALUES (@nombre, @contacto, @telefono, @correo, @domicilio, @tipo)
+    `);
+
+    const created = result.recordset[0];
+    res.status(201).json(created);
   } catch (err) {
     console.error("❌ Error al agregar cliente:", err);
     res.status(500).json({ error: "Error al agregar cliente" });

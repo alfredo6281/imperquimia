@@ -7,7 +7,7 @@ import { InventoryMovements } from "./components/inventory-movements";
 import { MovementHistory } from "./components/movement-history";
 import { Reports } from "./components/reports";
 import { QuotesHistory } from "./components/quotes-history";
-import { CustomersManagement } from "./components/customers-management"
+import { CustomersManagement } from "./components/customers/customers-management"
 import { NewQuote } from "./components/new-quote";
 export default function App() {
   const [activeView, setActiveView] = useState("inventory");

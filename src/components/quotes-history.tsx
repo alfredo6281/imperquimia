@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { ArrowLeft, FileText, Search, Filter, Download, Eye, ShoppingCart, Trash2 } from "lucide-react";
+import { ArrowLeft, FileText, Search, Filter, Download, Eye, ShoppingCart, Trash2, Plus } from "lucide-react";
 import { Button } from "./ui/button";
 import { Input } from "./ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "./ui/select";
@@ -208,7 +208,7 @@ export function QuotesHistory({ onViewChange }: QuotesHistoryProps) {
           onClick={() => onViewChange('new-quote')}
           className="bg-blue-600 hover:bg-blue-700 text-white rounded-lg"
         >
-          <FileText className="h-4 w-4 mr-2" />
+          <Plus className="h-4 w-4 mr-2" />
           Nueva Cotización
         </Button>
         <Button 
@@ -221,6 +221,7 @@ export function QuotesHistory({ onViewChange }: QuotesHistoryProps) {
         </Button>
         
         {/* Búsqueda */}
+        
         <div className="flex-1 min-w-64 relative">
           <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-slate-400" />
           <Input

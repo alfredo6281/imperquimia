@@ -54,8 +54,8 @@ export function InventoryDashboard({ onViewChange }: InventoryDashboardProps) {
 
   const filteredProducts = products.filter(product =>
     product.nombre.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    product.categoria.toLowerCase().includes(searchTerm.toLowerCase()) //||
-    //product.idProducto.toLowerCase().includes(searchTerm.toLowerCase())
+    product.categoria.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    product.idProducto.toString().toLowerCase().includes(searchTerm.toLowerCase())
   );
 
   // Cálculos para paginación

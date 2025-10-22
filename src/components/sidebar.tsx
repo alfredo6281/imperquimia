@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Package, FileBarChart, FileText, Users, User, LogOut } from "lucide-react";
+import { Package, FileBarChart, FileText, Users, User, LogOut, ShoppingCart, ReceiptText } from "lucide-react";
 import { Button } from "./ui/button";
 import { toast } from "sonner";
 
@@ -11,9 +11,11 @@ interface SidebarProps {
 export function Sidebar({ activeView, onViewChange }: SidebarProps) {
   const menuItems = [
     { id: 'inventory', label: 'Inventario', icon: Package },
+    { id: 'sales-history', label: 'Ventas', icon: ShoppingCart},
     { id: 'quote-history', label: 'Cotización', icon: FileText},
     { id: 'client', label: 'Clientes', icon: Users},
     { id: 'reports', label: 'Reportes', icon: FileBarChart },
+    { id: 'bill', label: 'Facturas', icon: ReceiptText}
   ];
   const [currentUser] = useState({
     name: "Juan Pérez",

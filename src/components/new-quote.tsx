@@ -1127,7 +1127,7 @@ export function NewQuote({ onViewChange }: NewQuoteProps) {
                   </div>
                 </div>
 
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-5 gap-4">
                   <div className="space-y-2">
                     <Label htmlFor="surface" className="text-slate-700">
                       Superficie
@@ -1156,9 +1156,6 @@ export function NewQuote({ onViewChange }: NewQuoteProps) {
                       min="0"
                     />
                   </div>
-                </div>
-
-                <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-2">
                     <Label htmlFor="advance" className="text-slate-700">
                       Anticipo
@@ -1187,9 +1184,7 @@ export function NewQuote({ onViewChange }: NewQuoteProps) {
                       placeholder="0.00"
                     />
                   </div>
-                </div>
-
-                <div className="space-y-2">
+                  <div className="space-y-2">
                   <Label htmlFor="warranty" className="text-slate-700">
                     Garantía
                   </Label>
@@ -1201,6 +1196,11 @@ export function NewQuote({ onViewChange }: NewQuoteProps) {
                     className="rounded-lg border-slate-300"
                   />
                 </div>
+                </div>
+
+           
+
+                
               </CardContent>
 
             </Card>

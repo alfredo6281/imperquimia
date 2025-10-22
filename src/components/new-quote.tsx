@@ -53,18 +53,57 @@ export function NewQuote({ onViewChange }: NewQuoteProps) {
     discount: 0,
     tax: 16,
   });
+  const DEFAULT_LABOR = {
+    description: "losa de azotea",
+    system: "Elastomerico c/malla Reforzada",
+    finish: "Blanco o Rojo",
+    surface: 85,
+    price: 172.00,
+    estimation: 14620,
+    advance: 70,
+    balance: 30,
+    warranty: "4",
+  };
   // Datos específicos para cotización de mano de obra
-  const [laborData, setLaborData] = useState({
-    system: "",
-    finish: "",
-    surface: "",
-    price: 0,
-    estimation: "",
-    advance: 0,
-    balance: 0,
-    warranty: "",
-  });
+  const [laborData, setLaborData] = useState(() => ({ ...DEFAULT_LABOR }));
+  // --- Reseteo específico para materiales ---
+  const resetMaterials = () => {
+    setItems([]);
+    setSelectedProduct("");
+    setQuantity(1);
+    setProductSearchTerm("");
+    // opcional: reset descuentos / tax si quieres
+    setFormData(prev => ({ ...prev, discount: 0, tax: 16 }));
+  };
 
+  // --- Reseteo específico para mano de obra ---
+  const resetLabor = () => {
+    setLaborData({
+      description: "",
+      system: "",
+      finish: "",
+      surface: 0,
+      price: 0,
+      estimation: 0,
+      advance: 0,
+      balance: 0,
+      warranty: ""
+    });
+  };
+
+
+  // --- Funcion para cambiar tipo con reseteo ---
+  const handleSetQuoteType = (type: "materials" | "labor") => {
+    if (type === quoteType) return;
+    if (type === "materials") {
+      // vamos a materiales => limpiar mano de obra si queremos
+      resetLabor();
+    } else {
+      // vamos a mano de obra => limpiar productos
+      resetMaterials();
+    }
+    setQuoteType(type);
+  };
   const [items, setItems] = useState<QuoteItem[]>([]);
   const [selectedProduct, setSelectedProduct] = useState("");
   const [quantity, setQuantity] = useState(1);
@@ -316,35 +355,52 @@ export function NewQuote({ onViewChange }: NewQuoteProps) {
 
   // Cálculos
   const handleLaborDataChange = (field: string, value: string | number) => {
-    setLaborData((prev) => ({
-      ...prev,
-      [field]: value,
-    }));
+    setLaborData(prev => {
+      const next = { ...prev, [field]: value };
 
-    // Auto-calcular balance cuando cambian precio o anticipo
-    if (field === "price" || field === "advance") {
-      const newPrice = field === "price" ? Number(value) : laborData.price;
-      const newAdvance = field === "advance" ? Number(value) : laborData.advance;
-      setLaborData((prev) => ({
-        ...prev,
-        balance: newPrice - newAdvance,
-      }));
-    }
+      // Normalizar a número
+      const surfaceNum = Number(next.surface) || 0;
+      const priceNum = Number(next.price) || 0;
+
+      // Estimación = superficie * precio (número con 2 decimales)
+      next.estimation = +(surfaceNum * priceNum).toFixed(2);
+
+
+      return next;
+    });
   };
+
   const [nota, setNota] = useState("");
   const date = new Date().toLocaleDateString("es-MX", {
     day: "numeric",
     month: "long",
     year: "numeric"
   });
-  const subtotal = quoteType === "materials"
-    ? items.reduce((sum, item) => sum + item.subtotal, 0)
-    : laborData.price;
-  const total = subtotal;
-  const discountAmount = (subtotal * formData.discount) / 100;
-  const taxableAmount = subtotal - discountAmount;
-  const taxAmount = (taxableAmount * formData.tax) / 100;
-  // Cálculos
+
+  // Cálculos separados por tipo
+  const subtotalMaterials = items.reduce((sum, item) => sum + item.subtotal, 0);
+  const subtotalLabor = Number(laborData.price) || 0;
+
+  // subtotal "activo" según tipo
+  const subtotal = quoteType === "materials" ? subtotalMaterials : subtotalLabor;
+
+  // descuentos/impuestos SOLO para materials
+  const discountAmount = quoteType === "materials"
+    ? (subtotalMaterials * (Number(formData.discount) || 0)) / 100
+    : 0;
+
+  const taxableAmount = quoteType === "materials"
+    ? subtotalMaterials - discountAmount
+    : 0;
+
+  const taxAmount = quoteType === "materials"
+    ? (taxableAmount * (Number(formData.tax) || 0)) / 100
+    : 0;
+
+  // total según tipo
+  const total = quoteType === "materials"
+    ? subtotalMaterials - discountAmount + taxAmount
+    : subtotalLabor; // para mano de obra, el total es el precio acordado (puedes restar anticipo si prefieres)
 
 
   const generatePDF = async () => {
@@ -358,7 +414,7 @@ export function NewQuote({ onViewChange }: NewQuoteProps) {
       return;
     }
 
-    
+
     const endpoint =
       quoteType === "materials"
         ? "http://localhost:5000/api/cotizacion/pdf"
@@ -395,18 +451,21 @@ export function NewQuote({ onViewChange }: NewQuoteProps) {
         toast.info("Generando PDF...");
       } else {
         // mano de obra: mapeo directo de laborData
+        /*basePayload.sistema = laborData.system ?? "";
         basePayload.acabado = laborData.finish ?? "";
         basePayload.superficie = laborData.surface ?? "";
         basePayload.estimacion = laborData.estimation ?? "";
         basePayload.anticipo = Number(laborData.advance) || 0;
         basePayload.saldo = Number(laborData.balance) || 0;
         basePayload.garantia = laborData.warranty ?? "";
-        basePayload.precio = Number(laborData.price) || 0;
+        basePayload.precio = Number(laborData.price) || 0;*/
 
         // Deja un array "manoobra" para luego detallar líneas/partidas de trabajo
-        basePayload.manoobra = [
+
+        basePayload.manoObra = [
           {
-            descripcion: laborData.system ?? "",
+            descripcion: laborData.description ?? "",
+            sistema: laborData.system ?? "",
             acabado: laborData.finish ?? "",
             superficie: laborData.surface ?? "",
             estimacion: laborData.estimation ?? "",
@@ -560,7 +619,7 @@ export function NewQuote({ onViewChange }: NewQuoteProps) {
           <Button
             type="button"
             variant={quoteType === "materials" ? "default" : "outline"}
-            onClick={() => setQuoteType("materials")}
+            onClick={() => handleSetQuoteType("materials")}
             className={quoteType === "materials"
               ? "bg-blue-600 hover:bg-blue-700 text-white rounded-lg"
               : "border-slate-300 text-slate-700 hover:bg-slate-50 rounded-lg"
@@ -572,7 +631,7 @@ export function NewQuote({ onViewChange }: NewQuoteProps) {
           <Button
             type="button"
             variant={quoteType === "labor" ? "default" : "outline"}
-            onClick={() => setQuoteType("labor")}
+            onClick={() => handleSetQuoteType("labor")}
             className={quoteType === "labor"
               ? "bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg"
               : "border-slate-300 text-slate-700 hover:bg-slate-50 rounded-lg"
@@ -1075,9 +1134,10 @@ export function NewQuote({ onViewChange }: NewQuoteProps) {
                     </Label>
                     <Input
                       id="surface"
+                      type="number"
                       value={laborData.surface}
                       onChange={(e) => handleLaborDataChange("surface", e.target.value)}
-                      placeholder="Ej: 150 m²"
+                      placeholder="Ej: 150"
                       className="rounded-lg border-slate-300"
                     />
                   </div>
@@ -1096,19 +1156,6 @@ export function NewQuote({ onViewChange }: NewQuoteProps) {
                       min="0"
                     />
                   </div>
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="estimation" className="text-slate-700">
-                    Estimación de Tiempo
-                  </Label>
-                  <Input
-                    id="estimation"
-                    value={laborData.estimation}
-                    onChange={(e) => handleLaborDataChange("estimation", e.target.value)}
-                    placeholder="Ej: 5 días hábiles"
-                    className="rounded-lg border-slate-300"
-                  />
                 </div>
 
                 <div className="grid grid-cols-2 gap-4">
@@ -1135,7 +1182,7 @@ export function NewQuote({ onViewChange }: NewQuoteProps) {
                       id="balance"
                       type="number"
                       value={laborData.balance || ""}
-                      readOnly
+                      onChange={(e) => handleLaborDataChange("balance", Number(e.target.value))}
                       className="rounded-lg border-slate-300 bg-slate-50"
                       placeholder="0.00"
                     />
@@ -1202,29 +1249,44 @@ export function NewQuote({ onViewChange }: NewQuoteProps) {
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="space-y-2">
-                <div className="flex justify-between">
-                  <span className="text-slate-600">Subtotal:</span>
-                  <span className="font-medium">${subtotal.toFixed(2)}</span>
-                </div>
+                {quoteType === "materials" ? (
+                  <>
+                    <div className="flex justify-between">
+                      <span className="text-slate-600">Subtotal:</span>
+                      <span className="font-medium">${subtotalMaterials.toFixed(2)}</span>
+                    </div>
 
-                {formData.discount > 0 && (
-                  <div className="flex justify-between">
-                    <span className="text-slate-600">Descuento ({formData.discount}%):</span>
-                    <span className="font-medium text-red-600">-${discountAmount.toFixed(2)}</span>
-                  </div>
+                    {formData.discount > 0 && (
+                      <div className="flex justify-between">
+                        <span className="text-slate-600">Descuento ({formData.discount}%):</span>
+                        <span className="font-medium text-red-600">-${discountAmount.toFixed(2)}</span>
+                      </div>
+                    )}
+
+                    <div className="flex justify-between">
+                      <span className="text-slate-600">IVA ({formData.tax}%):</span>
+                      <span className="font-medium">${taxAmount.toFixed(2)}</span>
+                    </div>
+
+                    <div className="border-t border-slate-200 pt-2">
+                      <div className="flex justify-between items-center">
+                        <span className="text-lg font-semibold text-slate-800">Total:</span>
+                        <span className="text-xl font-bold text-blue-600">${total.toFixed(2)}</span>
+                      </div>
+                    </div>
+                  </>
+                ) : (
+                  // resumen para "labor"
+                  <>
+
+                    <div className="flex justify-between items-center">
+                      <span className="text-lg font-semibold text-slate-800">Estimacion:</span>
+                      <span className="text-xl font-bold text-blue-600">${(Number(laborData.surface) * Number(laborData.price)).toFixed(2)}</span>
+                    </div>
+
+                  </>
                 )}
 
-                <div className="flex justify-between">
-                  <span className="text-slate-600">IVA ({formData.tax}%):</span>
-                  <span className="font-medium">${taxAmount.toFixed(2)}</span>
-                </div>
-
-                <div className="border-t border-slate-200 pt-2">
-                  <div className="flex justify-between items-center">
-                    <span className="text-lg font-semibold text-slate-800">Total:</span>
-                    <span className="text-xl font-bold text-blue-600">${total.toFixed(2)}</span>
-                  </div>
-                </div>
               </div>
 
               <div className="text-sm text-slate-500 space-y-1">
@@ -1243,7 +1305,7 @@ export function NewQuote({ onViewChange }: NewQuoteProps) {
                   disabled={
                     !formData.clientId ||
                     (quoteType === "materials" && items.length === 0) ||
-                    (quoteType === "labor" && !laborData.system)
+                    (quoteType === "labor" && !laborData.system.trim())
                   }
                 >
                   <Save className="h-4 w-4 mr-2" />

@@ -1,9 +1,10 @@
 import { useState, useEffect } from "react";
-import { ArrowLeft, Plus, Trash2, Save, Calculator, FileText, Search, UserPlus, X, Download, ShoppingCart } from "lucide-react";
+import { ArrowLeft, Plus, Trash2, Save, Calculator, FileText, Search, UserPlus, X, Download, ShoppingCart, Package } from "lucide-react";
 import { Button } from "./ui/button";
 import { Input } from "./ui/input";
 import { Label } from "./ui/label";
 import { Textarea } from "./ui/textarea";
+import { Checkbox } from "./ui/checkbox";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "./ui/select";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "./ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "./ui/table";
@@ -13,7 +14,7 @@ import { toast } from "sonner";
 interface NewQuoteProps {
   onViewChange: (view: string) => void;
 }
-interface Product { 
+interface Product {
   idProducto: number;
   nombre: string;
   categoria: string;
@@ -51,12 +52,24 @@ export function NewQuote({ onViewChange }: NewQuoteProps) {
     notes: "",
     discount: 0,
     tax: 16,
-    validDays: 30
   });
-  
+  // Datos específicos para cotización de mano de obra
+  const [laborData, setLaborData] = useState({
+    system: "",
+    finish: "",
+    surface: "",
+    price: 0,
+    estimation: "",
+    advance: 0,
+    balance: 0,
+    warranty: "",
+  });
+
   const [items, setItems] = useState<QuoteItem[]>([]);
   const [selectedProduct, setSelectedProduct] = useState("");
   const [quantity, setQuantity] = useState(1);
+  const [includeDescriptions, setIncludeDescriptions] = useState(true);
+  const [quoteType, setQuoteType] = useState<"materials" | "labor">("materials");
   const [productSearchTerm, setProductSearchTerm] = useState("");
   const [clientSearchTerm, setClientSearchTerm] = useState("");
   const [showNewClientModal, setShowNewClientModal] = useState(false);
@@ -78,7 +91,10 @@ export function NewQuote({ onViewChange }: NewQuoteProps) {
         if (!res.ok) throw new Error("Error cargando clientes");
         const data = await res.json();
         // mapea los campos del backend (idCliente, nombre, telefono, correo, direccion)
-        const mapped = data.map((c: { idCliente: any; id: any; nombre: any; name: any; telefono: any; phone: any; correo: any; email: any; domicilio: any; address: any; }) => ({
+        const mapped = data.map((c: {
+          idCliente: any; id: any; nombre: any; name: any;
+          telefono: any; phone: any; correo: any; email: any; domicilio: any; address: any;
+        }) => ({
           id: String(c.idCliente ?? c.id ?? c.idCliente),
           name: c.nombre ?? c.name,
           phone: c.telefono ?? c.phone ?? "",
@@ -171,8 +187,10 @@ export function NewQuote({ onViewChange }: NewQuoteProps) {
 
       // actualiza estado local
       setClients(prev => [...prev, newClient]);
-      setFormData(prev => ({ ...prev, clientId: newClient.id, clientName: newClient.name, 
-        clientPhone: newClient.phone, clientAddress: newClient.address, clientEmail: newClient.email }));
+      setFormData(prev => ({
+        ...prev, clientId: newClient.id, clientName: newClient.name,
+        clientPhone: newClient.phone, clientAddress: newClient.address, clientEmail: newClient.email
+      }));
 
       // limpiar UI
       setNewClientData({ name: "", phone: "", email: "", address: "" });
@@ -209,8 +227,8 @@ export function NewQuote({ onViewChange }: NewQuoteProps) {
 
     const existingItem = items.find(item => item.productId === selectedProduct);
     if (existingItem) {
-      setItems(prev => prev.map(item => 
-        item.productId === selectedProduct 
+      setItems(prev => prev.map(item =>
+        item.productId === selectedProduct
           ? { ...item, quantity: item.quantity + quantity, subtotal: (item.quantity + quantity) * product.precioUnitario }
           : item
       ));
@@ -228,6 +246,7 @@ export function NewQuote({ onViewChange }: NewQuoteProps) {
         subtotal: quantity * product.precioUnitario,
         discount: 0,
         notes: ""
+
       };
       setItems(prev => [...prev, newItem]);
     }
@@ -249,8 +268,8 @@ export function NewQuote({ onViewChange }: NewQuoteProps) {
       return;
     }
 
-    setItems(prev => prev.map(item => 
-      item.id === itemId 
+    setItems(prev => prev.map(item =>
+      item.id === itemId
         ? { ...item, quantity: newQuantity, subtotal: newQuantity * item.unitPrice }
         : item
     ));
@@ -262,8 +281,8 @@ export function NewQuote({ onViewChange }: NewQuoteProps) {
       return;
     }
 
-    setItems(prev => prev.map(item => 
-      item.id === itemId 
+    setItems(prev => prev.map(item =>
+      item.id === itemId
         ? { ...item, unitPrice: newPrice, subtotal: item.quantity * newPrice }
         : item
     ));
@@ -296,51 +315,115 @@ export function NewQuote({ onViewChange }: NewQuoteProps) {
   };
 
   // Cálculos
-  const subtotal = items.reduce((sum, item) => sum + item.subtotal, 0);
-  const discountAmount = (subtotal * formData.discount) / 100;
-  const taxableAmount = subtotal - discountAmount;
-  const taxAmount = (taxableAmount * formData.tax) / 100;
-  const total = taxableAmount + taxAmount;
+  const handleLaborDataChange = (field: string, value: string | number) => {
+    setLaborData((prev) => ({
+      ...prev,
+      [field]: value,
+    }));
+
+    // Auto-calcular balance cuando cambian precio o anticipo
+    if (field === "price" || field === "advance") {
+      const newPrice = field === "price" ? Number(value) : laborData.price;
+      const newAdvance = field === "advance" ? Number(value) : laborData.advance;
+      setLaborData((prev) => ({
+        ...prev,
+        balance: newPrice - newAdvance,
+      }));
+    }
+  };
   const [nota, setNota] = useState("");
   const date = new Date().toLocaleDateString("es-MX", {
     day: "numeric",
     month: "long",
     year: "numeric"
   });
+  const subtotal = quoteType === "materials"
+    ? items.reduce((sum, item) => sum + item.subtotal, 0)
+    : laborData.price;
+  const total = subtotal;
+  const discountAmount = (subtotal * formData.discount) / 100;
+  const taxableAmount = subtotal - discountAmount;
+  const taxAmount = (taxableAmount * formData.tax) / 100;
+  // Cálculos
+
+
   const generatePDF = async () => {
-    if (!formData.clientId || items.length === 0) {
+    // validación condicional
+    if (
+      !formData.clientId ||
+      (quoteType === "materials" && items.length === 0) ||
+      (quoteType === "labor" && !laborData.system.trim())
+    ) {
       toast.error("Completa la cotización antes de generar el PDF");
       return;
     }
 
-    toast.info("Generando PDF...");
+    
+    const endpoint =
+      quoteType === "materials"
+        ? "http://localhost:5000/api/cotizacion/pdf"
+        : "http://localhost:5000/api/servicio/pdf";
 
     try {
-      const response = await fetch("http://localhost:5000/api/cotizacion/pdf", {
+      // payload base común
+      const basePayload: any = {
+        quoteType,//este es el que manda al cotizacionController, que cotizacion es
+        numero: formData.clientId,
+        cliente: formData.clientName,
+        domicilio: formData.clientAddress,
+        telefono: formData.clientPhone,
+        correo: formData.clientEmail,
+        nota,
+        subtotal,
+        total,
+        date,
+      };
+
+      // datos específicos por tipo
+      if (quoteType === "materials") {
+        basePayload.productos = items.map((item) => ({
+          codigo: item.productId,
+          nombre: item.productName,
+          color: item.color,
+          tipo: item.type,
+          unidad: item.unity,
+          unidadMedida: item.unitMed,
+          cantidad: item.quantity,
+          precio: item.unitPrice,
+        }));
+        basePayload.iva = taxAmount;
+        toast.info("Generando PDF...");
+      } else {
+        // mano de obra: mapeo directo de laborData
+        basePayload.acabado = laborData.finish ?? "";
+        basePayload.superficie = laborData.surface ?? "";
+        basePayload.estimacion = laborData.estimation ?? "";
+        basePayload.anticipo = Number(laborData.advance) || 0;
+        basePayload.saldo = Number(laborData.balance) || 0;
+        basePayload.garantia = laborData.warranty ?? "";
+        basePayload.precio = Number(laborData.price) || 0;
+
+        // Deja un array "manoobra" para luego detallar líneas/partidas de trabajo
+        basePayload.manoobra = [
+          {
+            descripcion: laborData.system ?? "",
+            acabado: laborData.finish ?? "",
+            superficie: laborData.surface ?? "",
+            estimacion: laborData.estimation ?? "",
+            precio: Number(laborData.price) || 0,
+            anticipo: Number(laborData.advance) || 0,
+            saldo: Number(laborData.balance) || 0,
+            garantia: laborData.warranty ?? "",
+          },
+          // puedes enviar más objetos si necesitas varias partidas
+        ];
+        toast.info("Generando PDF...");
+      }
+
+      const response = await fetch(endpoint, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          numero: formData.clientId,
-          cliente: formData.clientName,
-          domicilio: formData.clientAddress,
-          telefono: formData.clientPhone,
-          correo: formData.clientEmail,
-          productos: items.map(item => ({
-            codigo: item.productId,
-            nombre: item.productName,
-            color: item.color,
-            tipo: item.type,
-            unidad: item.unity,
-            unidadMedida: item.unitMed,
-            cantidad: item.quantity,
-            precio: item.unitPrice,
-          })),
-          nota,
-          subtotal,
-          iva: taxAmount,
-          total,
-          date
-        })
+        body: JSON.stringify(basePayload),
       });
 
       if (!response.ok) {
@@ -351,7 +434,6 @@ export function NewQuote({ onViewChange }: NewQuoteProps) {
       const data = await response.json();
       if (data && data.url) {
         toast.success("PDF generado con éxito");
-        // Abrir URL pública (el navegador mostrará el PDF y sugerirá el nombre C-<numero>.pdf)
         window.open(data.url, "_blank");
       } else {
         toast.error("No se devolvió URL del PDF");
@@ -363,23 +445,32 @@ export function NewQuote({ onViewChange }: NewQuoteProps) {
   };
 
 
+
   const convertToSale = () => {
     if (!formData.clientId || items.length === 0) {
       toast.error("Completa la cotización antes de convertir a venta");
       return;
     }
+    if (quoteType === "materials" && items.length === 0) {
+      toast.error("Agrega al menos un producto");
+      return;
+    }
 
+    if (quoteType === "labor" && !laborData.system) {
+      toast.error("Completa la información de mano de obra");
+      return;
+    }
     // Guardar cotización primero
     const quoteData = {
       id: `COT-${Date.now()}`,
       clientId: formData.clientId,
       clientName: formData.clientName,
-      items,
+      quoteType,
+      items: quoteType === "materials" ? items : [],
       subtotal,
       discount: formData.discount,
       tax: formData.tax,
       total,
-      validDays: formData.validDays,
       notes: formData.notes,
       date: new Date().toISOString().split('T')[0],
       status: 'Convertida a Venta'
@@ -405,7 +496,7 @@ export function NewQuote({ onViewChange }: NewQuoteProps) {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     if (!formData.clientId) {
       toast.error("Selecciona un cliente");
       return;
@@ -425,7 +516,6 @@ export function NewQuote({ onViewChange }: NewQuoteProps) {
       discount: formData.discount,
       tax: formData.tax,
       total,
-      validDays: formData.validDays,
       notes: formData.notes,
       date: new Date().toISOString().split('T')[0],
       status: 'Pendiente'
@@ -436,7 +526,7 @@ export function NewQuote({ onViewChange }: NewQuoteProps) {
     localStorage.setItem('quotes', JSON.stringify(existingQuotes));
 
     toast.success("Cotización creada exitosamente");
-    
+
     setTimeout(() => {
       onViewChange('quotes-history');
     }, 1000);
@@ -446,32 +536,61 @@ export function NewQuote({ onViewChange }: NewQuoteProps) {
 
   return (
     <div className="flex-1 p-6">
-      <div className="mb-6 flex items-center gap-4">
-        <Button 
-          variant="outline" 
-          onClick={() => onViewChange('quote-history')}
-          className="border-slate-300 text-slate-700 hover:bg-slate-50 rounded-lg"
-        >
-          <ArrowLeft className="h-4 w-4 mr-2" />
-          Volver a Historial
-        </Button>
-        <div className="flex items-center gap-3">
-          <FileText className="h-6 w-6 text-blue-600" />
-          <div>
-            <h2 className="text-slate-800 text-2xl font-semibold">Nueva Cotización</h2>
-            <p className="text-slate-600">Crea una cotización para enviar al cliente</p>
+      <div className="mb-6 flex items-center justify-between">
+        <div className="flex items-center gap-4">
+          <Button
+            variant="outline"
+            onClick={() => onViewChange('quote-history')}
+            className="border-slate-300 text-slate-700 hover:bg-slate-50 rounded-lg"
+          >
+            <ArrowLeft className="h-4 w-4 mr-2" />
+            Volver a Historial
+          </Button>
+          <div className="flex items-center gap-3">
+            <FileText className="h-6 w-6 text-blue-600" />
+            <div>
+              <h2 className="text-slate-800 text-2xl font-semibold">Nueva Cotización</h2>
+              <p className="text-slate-600">Crea una cotización para enviar al cliente</p>
+            </div>
           </div>
         </div>
+
+        {/* Selector de tipo de cotización */}
+        <div className="flex gap-2">
+          <Button
+            type="button"
+            variant={quoteType === "materials" ? "default" : "outline"}
+            onClick={() => setQuoteType("materials")}
+            className={quoteType === "materials"
+              ? "bg-blue-600 hover:bg-blue-700 text-white rounded-lg"
+              : "border-slate-300 text-slate-700 hover:bg-slate-50 rounded-lg"
+            }
+          >
+            <Package className="h-4 w-4 mr-2" />
+            Materiales
+          </Button>
+          <Button
+            type="button"
+            variant={quoteType === "labor" ? "default" : "outline"}
+            onClick={() => setQuoteType("labor")}
+            className={quoteType === "labor"
+              ? "bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg"
+              : "border-slate-300 text-slate-700 hover:bg-slate-50 rounded-lg"
+            }
+          >
+            <UserPlus className="h-4 w-4 mr-2" />
+            Mano de Obra
+          </Button>
+        </div>
       </div>
+
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Formulario principal */}
         <div className="lg:col-span-2 space-y-6">
           {/* Información del cliente */}
           <Card className="border-slate-200 rounded-lg">
-            <CardHeader>
-              <CardTitle className="text-slate-800">Información del Cliente</CardTitle>
-            </CardHeader>
+
             <CardContent className="space-y-4">
               {/* Cliente seleccionado o buscador */}
               {selectedClient ? (
@@ -495,7 +614,7 @@ export function NewQuote({ onViewChange }: NewQuoteProps) {
                       type="button"
                       variant="outline"
                       size="sm"
-                      
+
                       onClick={() => {
                         setFormData((prev) => ({
                           ...prev,
@@ -591,7 +710,7 @@ export function NewQuote({ onViewChange }: NewQuoteProps) {
                                 )
                               }
                               placeholder="Ej: 555-0123"
-                              
+
                               className="rounded-lg border-slate-300"
                             />
                           </div>
@@ -686,239 +805,388 @@ export function NewQuote({ onViewChange }: NewQuoteProps) {
           </Card>
 
           {/* Agregar productos */}
-          <Card className="border-slate-200 rounded-lg">
-            <CardHeader>
-              <CardTitle className="text-slate-800">Agregar Productos</CardTitle>
-            </CardHeader>
-            <CardContent>
-              {/* Buscador de productos */}
-              <div className="mb-4">
-                <Label htmlFor="product-search" className="text-slate-700">Buscar Producto</Label>
-                <div className="relative">
-                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-slate-400" />
-                  <Input
-                    id="product-search"
-                    value={productSearchTerm}
-                    onChange={(e) => setProductSearchTerm(e.target.value)}
-                    placeholder="Buscar por nombre o categoría..."
-                    className="pl-10 rounded-lg border-slate-300"
-                    autoComplete="off"
-                  />
-                </div>
-                {productSearchTerm && filteredProducts.length > 0 && (
-                  <div className="mt-2 border border-slate-200 rounded-lg max-h-40 overflow-y-auto">
-                    {filteredProducts.map((product) => (
-                      <div
-                        key={product.idProducto}
-                        onClick={() => {
-                          setSelectedProduct(product.idProducto.toString());
-                          setProductSearchTerm("");
-                        }}
-                        className="p-3 hover:bg-slate-50 cursor-pointer border-b border-slate-100 last:border-b-0"
-                      >
-                        <div className="font-medium text-slate-800">{product.nombre} - {product.tipo}: {product.unidad} {product.unidadMedida} {product.color}</div>
-                        <div className="text-sm text-slate-600">${product.precioUnitario} • Stock: {product.stock} • {product.categoria}</div>
-                      </div>
-                    ))}
+          {quoteType === "materials" ? (
+            <Card className="border-slate-200 rounded-lg">
+              <CardHeader>
+                <div className="flex items-center justify-between">
+                  <CardTitle className="text-slate-800">Agregar Productos</CardTitle>
+                  <div className="flex items-center space-x-2">
+                    <Checkbox
+                      id="include-descriptions-sale"
+                      checked={includeDescriptions}
+                      onCheckedChange={(checked) =>
+                        setIncludeDescriptions(checked as boolean)
+                      }
+                    />
+                    <Label
+                      htmlFor="include-descriptions-sale"
+                      className="text-sm text-slate-700 cursor-pointer whitespace-nowrap"
+                    >
+                      Incluir descripción
+                    </Label>
                   </div>
-                )}
-              </div>
-
-              <div className="flex gap-4 mb-4">
-                <div className="flex-1">
-                  <Label htmlFor="product" className="text-slate-700">Producto Seleccionado</Label>
-                  <Select value={selectedProduct} onValueChange={setSelectedProduct}>
-                    <SelectTrigger className="rounded-lg border-slate-300">
-                      <SelectValue placeholder="Selecciona un producto" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {products.map((product) => (
-                        <SelectItem key={product.idProducto} value={product.idProducto.toString()}>
-                          <div className="flex flex-col">
-                            <span className="font-medium">{product.nombre} - {product.tipo}: {product.unidad} {product.unidadMedida} {product.color}</span>
-                            <span className="text-sm text-slate-500">
-                              ${product.precioUnitario} • Stock: {product.stock} • {product.categoria}
-                            </span>
-                          </div>
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
                 </div>
-                <div className="w-24">
-                  <Label htmlFor="quantity" className="text-slate-700">Cantidad</Label>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                {/* Buscador de productos */}
+                <div className="mb-4">
+                  <Label htmlFor="product-search" className="text-slate-700">Buscar Producto</Label>
+                  <div className="relative">
+                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-slate-400" />
+                    <Input
+                      id="product-search"
+                      value={productSearchTerm}
+                      onChange={(e) => setProductSearchTerm(e.target.value)}
+                      placeholder="Buscar por nombre o categoría..."
+                      className="pl-10 rounded-lg border-slate-300"
+                      autoComplete="off"
+                    />
+                  </div>
+                  {productSearchTerm && filteredProducts.length > 0 && (
+                    <div className="mt-2 border border-slate-200 rounded-lg max-h-40 overflow-y-auto">
+                      {filteredProducts.map((product) => (
+                        <div
+                          key={product.idProducto}
+                          onClick={() => {
+                            setSelectedProduct(product.idProducto.toString());
+                            setProductSearchTerm("");
+                          }}
+                          className="p-3 hover:bg-slate-50 cursor-pointer border-b border-slate-100 last:border-b-0"
+                        >
+                          <div className="font-medium text-slate-800">{product.nombre} - {product.tipo}: {product.unidad} {product.unidadMedida} {product.color}</div>
+                          <div className="text-sm text-slate-600">${product.precioUnitario} • Stock: {product.stock} • {product.categoria}</div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                <div className="flex gap-4 mb-4">
+                  <div className="flex-1">
+                    <Label htmlFor="product" className="text-slate-700">Producto Seleccionado</Label>
+                    <Select value={selectedProduct} onValueChange={setSelectedProduct}>
+                      <SelectTrigger className="rounded-lg border-slate-300">
+                        <SelectValue placeholder="Selecciona un producto" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {products.map((product) => (
+                          <SelectItem key={product.idProducto} value={product.idProducto.toString()}>
+                            <div className="flex flex-col">
+                              <span className="font-medium">{product.nombre} - {product.tipo}: {product.unidad} {product.unidadMedida} {product.color}</span>
+                              <span className="text-sm text-slate-500">
+                                ${product.precioUnitario} • Stock: {product.stock} • {product.categoria}
+                              </span>
+                            </div>
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="w-24">
+                    <Label htmlFor="quantity" className="text-slate-700">Cantidad</Label>
+                    <Input
+                      id="quantity"
+                      type="number"
+                      value={quantity}
+                      onChange={(e) => setQuantity(Number(e.target.value))}
+                      min="1"
+                      className="rounded-lg border-slate-300"
+                    />
+                  </div>
+                  <div className="flex items-end">
+                    <Button
+                      type="button"
+                      onClick={addItem}
+                      className="bg-blue-600 hover:bg-blue-700 text-white rounded-lg"
+                    >
+                      <Plus className="h-4 w-4 mr-1" />
+                      Agregar
+                    </Button>
+                  </div>
+                </div>
+
+                {items.length > 0 && (
+                  <div className="border border-slate-200 rounded-lg ">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Producto</TableHead>
+                          <TableHead className="w-20">
+                            Cantidad
+                          </TableHead>
+                          <TableHead className="w-28">
+                            Precio Unit.
+                          </TableHead>
+                          <TableHead className="w-24">
+                            Desc. %
+                          </TableHead>
+                          <TableHead className="w-24">
+                            Subtotal
+                          </TableHead>
+                          <TableHead className="w-16">
+                            Acciones
+                          </TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {items.map((item) => {
+                          const itemTotal = item.quantity * item.unitPrice;
+                          const discountAmount = (itemTotal * item.discount) / 100;
+
+                          return (
+                            <TableRow key={item.id}>
+                              <TableCell className="font-medium">
+                                {item.productName} {item.unity} {item.unitMed} {item.color}
+                              </TableCell>
+                              <TableCell>
+                                <Input
+                                  type="number"
+                                  value={item.quantity}
+                                  onChange={(e) =>
+                                    updateItemQuantity(
+                                      item.id,
+                                      Number(e.target.value),
+                                    )
+                                  }
+                                  min="1"
+                                  className="w-16 h-8 text-center border-slate-300"
+                                />
+                              </TableCell>
+                              <TableCell>
+                                <div className="flex items-center gap-1">
+                                  <span className="text-xs text-slate-500">
+                                    $
+                                  </span>
+                                  <Input
+                                    type="number"
+                                    value={item.unitPrice}
+                                    onChange={(e) =>
+                                      updateItemPrice(
+                                        item.id,
+                                        Number(e.target.value),
+                                      )
+                                    }
+                                    min="0"
+                                    step="0.01"
+                                    className="w-20 h-8 text-center border-slate-300"
+                                  />
+                                </div>
+                              </TableCell>
+                              <TableCell>
+                                <div className="flex items-center gap-1">
+                                  <Input
+                                    type="number"
+                                    value={item.discount}
+                                    onChange={(e) =>
+                                      updateItemDiscount(
+                                        item.id,
+                                        Number(e.target.value),
+                                      )
+                                    }
+                                    min="0"
+                                    max="100"
+                                    step="0.1"
+                                    className="w-16 h-8 text-center border-slate-300"
+                                  />
+                                  <span className="text-xs text-slate-500">%</span>
+                                </div>
+                                {item.discount > 0 && (
+                                  <div className="text-xs text-green-600 mt-1">
+                                    -${discountAmount.toFixed(2)}
+                                  </div>
+                                )}
+                              </TableCell>
+                              <TableCell>
+                                <div className="font-semibold">
+                                  ${item.subtotal.toFixed(2)}
+                                </div>
+                                {item.discount > 0 && (
+                                  <div className="text-xs text-slate-500 line-through">
+                                    ${itemTotal.toFixed(2)}
+                                  </div>
+                                )}
+                              </TableCell>
+                              <TableCell>
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  onClick={() =>
+                                    removeItem(item.id)
+                                  }
+                                  className="h-8 w-8 p-0 border-red-300 text-red-600 hover:bg-red-50"
+                                >
+                                  <Trash2 className="h-3 w-3" />
+                                </Button>
+                              </TableCell>
+                            </TableRow>
+                          );
+                        })}
+                      </TableBody>
+                    </Table>
+                    <div className="p-3 bg-slate-50 text-xs text-slate-600 border-t border-slate-200">
+                      💡 Tip: Puedes modificar cantidades, precios y aplicar descuentos individuales directamente en la tabla
+                    </div>
+
+                  </div>
+
+                )}
+              </CardContent>
+
+            </Card>
+          ) : (
+            <Card className="border-slate-200 rounded-lg">
+              <CardHeader>
+                <CardTitle className="text-slate-800">
+                  Información de Mano de Obra
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="system" className="text-slate-700">
+                      Sistema *
+                    </Label>
+                    <Input
+                      id="system"
+                      value={laborData.system}
+                      onChange={(e) => handleLaborDataChange("system", e.target.value)}
+                      placeholder="Ej: Impermeabilización de techos"
+                      className="rounded-lg border-slate-300"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="finish" className="text-slate-700">
+                      Acabado
+                    </Label>
+                    <Input
+                      id="finish"
+                      value={laborData.finish}
+                      onChange={(e) => handleLaborDataChange("finish", e.target.value)}
+                      placeholder="Ej: Texturizado, liso"
+                      className="rounded-lg border-slate-300"
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="surface" className="text-slate-700">
+                      Superficie
+                    </Label>
+                    <Input
+                      id="surface"
+                      value={laborData.surface}
+                      onChange={(e) => handleLaborDataChange("surface", e.target.value)}
+                      placeholder="Ej: 150 m²"
+                      className="rounded-lg border-slate-300"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="price" className="text-slate-700">
+                      Precio Total *
+                    </Label>
+                    <Input
+                      id="price"
+                      type="number"
+                      value={laborData.price || ""}
+                      onChange={(e) => handleLaborDataChange("price", Number(e.target.value))}
+                      placeholder="0.00"
+                      className="rounded-lg border-slate-300"
+                      step="0.01"
+                      min="0"
+                    />
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="estimation" className="text-slate-700">
+                    Estimación de Tiempo
+                  </Label>
                   <Input
-                    id="quantity"
-                    type="number"
-                    value={quantity}
-                    onChange={(e) => setQuantity(Number(e.target.value))}
-                    min="1"
+                    id="estimation"
+                    value={laborData.estimation}
+                    onChange={(e) => handleLaborDataChange("estimation", e.target.value)}
+                    placeholder="Ej: 5 días hábiles"
                     className="rounded-lg border-slate-300"
                   />
                 </div>
-                <div className="flex items-end">
-                  <Button
-                    type="button"
-                    onClick={addItem}
-                    className="bg-blue-600 hover:bg-blue-700 text-white rounded-lg"
-                  >
-                    <Plus className="h-4 w-4 mr-1" />
-                    Agregar
-                  </Button>
-                </div>
-              </div>
 
-              {items.length > 0 && (
-                <div className="border border-slate-200 rounded-lg">
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>Producto</TableHead>
-                        <TableHead className="w-20">
-                          Cantidad
-                        </TableHead>
-                        <TableHead className="w-28">
-                          Precio Unit.
-                        </TableHead>
-                        <TableHead className="w-24">
-                          Desc. %
-                        </TableHead>
-                        <TableHead className="w-24">
-                          Subtotal
-                        </TableHead>
-                        <TableHead className="w-16">
-                          Acciones
-                        </TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {items.map((item) => {
-                        const itemTotal = item.quantity * item.unitPrice;
-                        const discountAmount = (itemTotal * item.discount) / 100;
-                        
-                        return (
-                          <TableRow key={item.id}>
-                            <TableCell className="font-medium">
-                              {item.productName} {item.unity} {item.unitMed} {item.color}
-                            </TableCell>
-                            <TableCell>
-                              <Input
-                                type="number"
-                                value={item.quantity}
-                                onChange={(e) =>
-                                  updateItemQuantity(
-                                    item.id,
-                                    Number(e.target.value),
-                                  )
-                                }
-                                min="1"
-                                className="w-16 h-8 text-center border-slate-300"
-                              />
-                            </TableCell>
-                            <TableCell>
-                              <div className="flex items-center gap-1">
-                                <span className="text-xs text-slate-500">
-                                  $
-                                </span>
-                                <Input
-                                  type="number"
-                                  value={item.unitPrice}
-                                  onChange={(e) =>
-                                    updateItemPrice(
-                                      item.id,
-                                      Number(e.target.value),
-                                    )
-                                  }
-                                  min="0"
-                                  step="0.01"
-                                  className="w-20 h-8 text-center border-slate-300"
-                                />
-                              </div>
-                            </TableCell>
-                            <TableCell>
-                              <div className="flex items-center gap-1">
-                                <Input
-                                  type="number"
-                                  value={item.discount}
-                                  onChange={(e) =>
-                                    updateItemDiscount(
-                                      item.id,
-                                      Number(e.target.value),
-                                    )
-                                  }
-                                  min="0"
-                                  max="100"
-                                  step="0.1"
-                                  className="w-16 h-8 text-center border-slate-300"
-                                />
-                                <span className="text-xs text-slate-500">%</span>
-                              </div>
-                              {item.discount > 0 && (
-                                <div className="text-xs text-green-600 mt-1">
-                                  -${discountAmount.toFixed(2)}
-                                </div>
-                              )}
-                            </TableCell>
-                            <TableCell>
-                              <div className="font-semibold">
-                                ${item.subtotal.toFixed(2)}
-                              </div>
-                              {item.discount > 0 && (
-                                <div className="text-xs text-slate-500 line-through">
-                                  ${itemTotal.toFixed(2)}
-                                </div>
-                              )}
-                            </TableCell>
-                            <TableCell>
-                              <Button
-                                size="sm"
-                                variant="outline"
-                                onClick={() =>
-                                  removeItem(item.id)
-                                }
-                                className="h-8 w-8 p-0 border-red-300 text-red-600 hover:bg-red-50"
-                              >
-                                <Trash2 className="h-3 w-3" />
-                              </Button>
-                            </TableCell>
-                          </TableRow>
-                        );
-                      })}
-                    </TableBody>
-                  </Table>
-                  <div className="p-3 bg-slate-50 text-xs text-slate-600 border-t border-slate-200">
-                    💡 Tip: Puedes modificar cantidades, precios y aplicar descuentos individuales directamente en la tabla
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="advance" className="text-slate-700">
+                      Anticipo
+                    </Label>
+                    <Input
+                      id="advance"
+                      type="number"
+                      value={laborData.advance || ""}
+                      onChange={(e) => handleLaborDataChange("advance", Number(e.target.value))}
+                      placeholder="0.00"
+                      className="rounded-lg border-slate-300"
+                      step="0.01"
+                      min="0"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="balance" className="text-slate-700">
+                      Saldo
+                    </Label>
+                    <Input
+                      id="balance"
+                      type="number"
+                      value={laborData.balance || ""}
+                      readOnly
+                      className="rounded-lg border-slate-300 bg-slate-50"
+                      placeholder="0.00"
+                    />
                   </div>
                 </div>
-              )}
-            </CardContent>
-          </Card>
 
+                <div className="space-y-2">
+                  <Label htmlFor="warranty" className="text-slate-700">
+                    Garantía
+                  </Label>
+                  <Input
+                    id="warranty"
+                    value={laborData.warranty}
+                    onChange={(e) => handleLaborDataChange("warranty", e.target.value)}
+                    placeholder="Ej: 5 años contra defectos de instalación"
+                    className="rounded-lg border-slate-300"
+                  />
+                </div>
+              </CardContent>
+
+            </Card>
+
+          )}
           {/* Información adicional */}
           <Card className="border-slate-200 rounded-lg">
             <CardHeader>
               <CardTitle className="text-slate-800">Notas</CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
-              <div className="relative">
-                <Textarea
-                  id="notes"
-                  value={nota}
-                  onChange={(e) => setNota(e.target.value)}
-                  placeholder="Condiciones, términos y observaciones especiales..."
-                  className="rounded-lg border-slate-300 pr-16 pb-8"
-                  maxLength={300}
-                />
-                <span className={`absolute bottom-2 right-2 text-xs px-2 py-1 rounded ${
-                  nota.length > 280 
-                    ? 'text-red-500' 
-                    : nota.length > 250 
-                      ? 'text-amber-500' 
+              <div className="space-y-2">
+                <div className="relative">
+                  <Textarea
+                    id="notes"
+                    value={nota}
+                    onChange={(e) => setNota(e.target.value)}
+                    placeholder="Condiciones, términos y observaciones especiales..."
+                    className="rounded-lg border-slate-300 pr-16 pb-8"
+                    maxLength={300}
+                  />
+
+                  <div className={`absolute bottom-2 right-2 text-xs px-2 py-1 rounded ${nota.length > 280
+                    ? 'text-red-500'
+                    : nota.length > 250
+                      ? 'text-amber-500'
                       : 'text-slate-400'
-                }`}>
-                  {nota.length}/300
-                </span>
+                    }`}>
+                    {nota.length}/300
+                  </div>
+                </div>
               </div>
+
             </CardContent>
           </Card>
         </div>
@@ -938,19 +1206,19 @@ export function NewQuote({ onViewChange }: NewQuoteProps) {
                   <span className="text-slate-600">Subtotal:</span>
                   <span className="font-medium">${subtotal.toFixed(2)}</span>
                 </div>
-                
+
                 {formData.discount > 0 && (
                   <div className="flex justify-between">
                     <span className="text-slate-600">Descuento ({formData.discount}%):</span>
                     <span className="font-medium text-red-600">-${discountAmount.toFixed(2)}</span>
                   </div>
                 )}
-                
+
                 <div className="flex justify-between">
                   <span className="text-slate-600">IVA ({formData.tax}%):</span>
                   <span className="font-medium">${taxAmount.toFixed(2)}</span>
                 </div>
-                
+
                 <div className="border-t border-slate-200 pt-2">
                   <div className="flex justify-between items-center">
                     <span className="text-lg font-semibold text-slate-800">Total:</span>
@@ -960,22 +1228,29 @@ export function NewQuote({ onViewChange }: NewQuoteProps) {
               </div>
 
               <div className="text-sm text-slate-500 space-y-1">
-                <p>Productos: {items.length}</p>
-                <p>Unidades: {items.reduce((sum, item) => sum + item.quantity, 0)}</p>
-                <p>Válida por: {formData.validDays} días</p>
+                {quoteType === "materials" ? (
+                  <>
+                    <p>Productos: {items.length}</p>
+                    <p>Unidades: {items.reduce((sum, item) => sum + item.quantity, 0)}</p>
+                  </>
+                ) : null}
               </div>
 
               <form onSubmit={handleSubmit} className="space-y-3">
-                <Button 
+                <Button
                   type="submit"
                   className="w-full bg-blue-600 hover:bg-blue-700 text-white rounded-lg"
-                  disabled={items.length === 0 || !formData.clientId}
+                  disabled={
+                    !formData.clientId ||
+                    (quoteType === "materials" && items.length === 0) ||
+                    (quoteType === "labor" && !laborData.system)
+                  }
                 >
                   <Save className="h-4 w-4 mr-2" />
                   Crear Cotización
                 </Button>
-                
-                <Button 
+
+                {/*<Button
                   type="button"
                   onClick={convertToSale}
                   className="w-full bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg"
@@ -983,20 +1258,24 @@ export function NewQuote({ onViewChange }: NewQuoteProps) {
                 >
                   <ShoppingCart className="h-4 w-4 mr-2" />
                   Convertir a Venta
-                </Button>
+                </Button>*/}
 
-                <Button 
+                <Button
                   type="button"
                   variant="outline"
                   onClick={generatePDF}
                   className="w-full border-slate-300 text-slate-700 hover:bg-slate-50 rounded-lg"
-                  disabled={items.length === 0 || !formData.clientId}
+                  disabled={
+                    !formData.clientId ||
+                    (quoteType === "materials" && items.length === 0) ||
+                    (quoteType === "labor" && !laborData.system)
+                  }
                 >
                   <Download className="h-4 w-4 mr-2" />
                   Generar PDF
                 </Button>
 
-                <Button 
+                <Button
                   type="button"
                   variant="outline"
                   onClick={() => onViewChange('sales')}

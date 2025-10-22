@@ -15,7 +15,6 @@ export function Sidebar({ activeView, onViewChange }: SidebarProps) {
     { id: 'client', label: 'Clientes', icon: Users},
     { id: 'reports', label: 'Reportes', icon: FileBarChart },
   ];
-
   const [currentUser] = useState({
     name: "Juan Pérez",
     role: "Administrador"
@@ -29,7 +28,7 @@ export function Sidebar({ activeView, onViewChange }: SidebarProps) {
     }, 1000);
   };
   return (
-    <div className="w-64 bg-slate-50 border-r border-slate-200 h-full flex flex-col">
+    <div className="fixed left-0 top-0 w-72 bg-slate-50 border-r border-slate-200 h-screen flex flex-col z-40">
       <div className="p-6 border-b border-slate-200">
         <img 
           src="./src/img/marca.png"

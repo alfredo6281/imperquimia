@@ -2,7 +2,6 @@
 import React from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription,
     DialogFooter} from "../ui/dialog"; // ajusta ruta
-import { Button } from "../ui/button";
 
 type ModalProps = {
   open: boolean;

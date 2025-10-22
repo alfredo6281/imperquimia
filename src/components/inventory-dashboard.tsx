@@ -36,7 +36,7 @@ export function InventoryDashboard({ onViewChange }: InventoryDashboardProps) {
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
   const [isViewModalOpen, setIsViewModalOpen] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
-  const [itemsPerPage] = useState(5);
+  const [itemsPerPage] = useState(4);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Datos mock del inventario

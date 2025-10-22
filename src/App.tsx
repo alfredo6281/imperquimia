@@ -38,10 +38,12 @@ export default function App() {
   };
 
   return (
-    <div className="h-screen bg-slate-50 flex">
-      <Sidebar activeView={activeView} onViewChange={setActiveView} />
-      {renderView()}
-      <Toaster position="top-right" />
+  <div className="h-screen bg-slate-50">
+    <Sidebar activeView={activeView} onViewChange={setActiveView} />
+    <div className="pl-72"> 
+      {renderView()} 
     </div>
-  );
+    <Toaster position="top-right" />
+  </div>
+);
 }

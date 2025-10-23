@@ -14,7 +14,7 @@ node_modules
 dist
 dist-ssr
 *.local
-
+git rm --cached SQLQuery1.sql
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json

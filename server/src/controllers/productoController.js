@@ -1,4 +1,4 @@
-import { pool, sql } from "../config/db.js";
+import { pool, sql } from "../../../client/src/config/db.js";
 import sharp from "sharp";
 import fs from "fs";
 import path from "path";

@@ -1,6 +1,6 @@
 
-import app from "./src/app.js";
-import { connectDB } from "./src/config/db.js";
+import app from "../client/src/App.js";
+import { connectDB } from "./config/db.js";
 
 const PORT = 5000;
 

@@ -1,14 +1,14 @@
 import { useState, useEffect } from "react";
 import { ArrowLeft, Plus, Trash2, Save, Calculator, ShoppingCart, Search, UserPlus, Download } from "lucide-react";
-import { Button } from "./ui/button";
-import { Input } from "./ui/input";
-import { Label } from "./ui/label";
-import { Textarea } from "./ui/textarea";
-import { Checkbox } from "./ui/checkbox";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "./ui/select";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "./ui/card";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "./ui/table";
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "./ui/dialog";
+import { Button } from "../../components/ui/button";
+import { Input } from "../../components/ui/input";
+import { Label } from "../../components/ui/label";
+import { Textarea } from "../../components/ui/textarea";
+import { Checkbox } from "../../components/ui/checkbox";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../../components/ui/select";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../../components/ui/card";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "../../components/ui/table";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "../../components/ui/dialog";
 import { toast } from "sonner";
 
 interface NewSaleProps {
@@ -311,11 +311,11 @@ export function NewSale({ onViewChange }: NewSaleProps) {
       <div className="mb-6 flex items-center gap-4">
         <Button 
           variant="outline" 
-          onClick={() => onViewChange('sales')}
+          onClick={() => onViewChange('sales-history')}
           className="border-slate-300 text-slate-700 hover:bg-slate-50 rounded-lg"
         >
           <ArrowLeft className="h-4 w-4 mr-2" />
-          Volver a Ventas
+          Volver a Historial
         </Button>
         <div className="flex items-center gap-3">
           <ShoppingCart className="h-6 w-6 text-emerald-600" />
@@ -476,9 +476,6 @@ export function NewSale({ onViewChange }: NewSaleProps) {
               <div className="flex items-center justify-between">
                 <div>
                   <CardTitle className="text-slate-800">Agregar Productos</CardTitle>
-                  <CardDescription className="text-slate-600">
-                    Selecciona los productos para incluir en la venta
-                  </CardDescription>
                 </div>
                 <div className="flex items-center space-x-2">
                   <Checkbox

@@ -1,13 +1,13 @@
 import { useState, useEffect } from "react";
 import { ArrowLeft, User, Package, Calendar, Filter, Download, TrendingUp, TrendingDown } from "lucide-react";
-import { Button } from "./ui/button";
-import { Input } from "./ui/input";
-import { Label } from "./ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "./ui/select";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "./ui/card";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "./ui/table";
-import { Badge } from "./ui/badge";
-import { Pagination, PaginationContent, PaginationItem, PaginationLink, PaginationNext, PaginationPrevious } from "./ui/pagination";
+import { Button } from "../../components/ui/button";
+import { Input } from "../../components/ui/input";
+import { Label } from "../../components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../../components/ui/select";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../../components/ui/card";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "../../components/ui/table";
+import { Badge } from "../../components/ui/badge";
+import { Pagination, PaginationContent, PaginationItem, PaginationLink, PaginationNext, PaginationPrevious } from "../../components/ui/pagination";
 
 interface MovementRecord {
   timestamp: string | number | Date;
@@ -41,46 +41,46 @@ export function MovementHistory({ onViewChange }: MovementHistoryProps) {
   // Usuarios mock
   const users = [
     { id: "1", name: "María González" },
-    { id: "2", name: "Carlos Rodríguez"},
+    { id: "2", name: "Carlos Rodríguez" },
     { id: "3", name: "Ana López" },
-    { id: "4", name: "Roberto Martínez"},
-    { id: "5", name: "Laura Silva"}
+    { id: "4", name: "Roberto Martínez" },
+    { id: "5", name: "Laura Silva" }
   ];
 
   useEffect(() => {
-  const fetchMovements = async () => {
-    try {
-      const res = await fetch("http://localhost:5000/api/movimiento");
-      const data = await res.json();
+    const fetchMovements = async () => {
+      try {
+        const res = await fetch("http://localhost:5000/api/movimiento");
+        const data = await res.json();
 
-      const formatted = data.map((item: any) => ({
-        id: item.idMovimiento,
-        productId: item.idProducto?.toString(),
-        productName: item.nombre || "Desconocido",
-        quantity: item.cantidad,
-        date: item.fecha,
-        type: item.tipo,
-        userName: item.userName || "Usuario desconocido",
-        userRole: item.usuarioRol || "Sin rol",
-        timestamp: item.fecha, // para usar en formatDateTime
-      }));
+        const formatted = data.map((item: any) => ({
+          id: item.idMovimiento,
+          productId: item.idProducto?.toString(),
+          productName: item.nombre || "Desconocido",
+          quantity: item.cantidad,
+          date: item.fecha,
+          type: item.tipo,
+          userName: item.userName || "Usuario desconocido",
+          userRole: item.usuarioRol || "Sin rol",
+          timestamp: item.fecha, // para usar en formatDateTime
+        }));
 
-      setMovements(formatted);
-      setFilteredMovements(formatted);
-    } catch (error) {
-      console.error("Error cargando movimientos:", error);
-    }
-  };
+        setMovements(formatted);
+        setFilteredMovements(formatted);
+      } catch (error) {
+        console.error("Error cargando movimientos:", error);
+      }
+    };
 
-  fetchMovements();
-}, []);
+    fetchMovements();
+  }, []);
 
   useEffect(() => {
     // Aplicar filtros
     let filtered = movements;
 
     if (searchTerm) {
-      filtered = filtered.filter(movement => 
+      filtered = filtered.filter(movement =>
         movement.productName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
         movement.userName?.toLowerCase().includes(searchTerm.toLowerCase())
       );
@@ -100,7 +100,7 @@ export function MovementHistory({ onViewChange }: MovementHistoryProps) {
 
     // Ordenar por fecha más reciente
     filtered.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
-    
+
     setFilteredMovements(filtered);
     setCurrentPage(1); // Reset página al filtrar
   }, [movements, searchTerm, userFilter, typeFilter, dateFilter]);
@@ -120,10 +120,10 @@ export function MovementHistory({ onViewChange }: MovementHistoryProps) {
 
   const exportToCSV = () => {
     const headers = "Fecha,Tipo,Producto,Cantidad,Usuario,Rol,Observaciones\n";
-    const csvData = filteredMovements.map(movement => 
+    const csvData = filteredMovements.map(movement =>
       `${movement.date},${movement.type === 'entries' ? 'Entrada' : 'Salida'},${movement.productName},${movement.quantity},${movement.userName || ''}"`
     ).join('\n');
-    
+
     const blob = new Blob([headers + csvData], { type: 'text/csv' });
     const url = window.URL.createObjectURL(blob);
     const a = document.createElement('a');
@@ -150,8 +150,8 @@ export function MovementHistory({ onViewChange }: MovementHistoryProps) {
   return (
     <div className="flex-1 p-6">
       <div className="mb-6 flex items-center gap-4">
-        <Button 
-          variant="outline" 
+        <Button
+          variant="outline"
           onClick={() => onViewChange('inventory')}
           className="border-slate-300 text-slate-700 hover:bg-slate-50 rounded-lg"
         >
@@ -188,7 +188,7 @@ export function MovementHistory({ onViewChange }: MovementHistoryProps) {
                 autoComplete="off"
               />
             </div>
-            
+
             <div className="space-y-2">
               <Label htmlFor="userFilter" className="text-slate-700">Usuario</Label>
               <Select value={userFilter} onValueChange={setUserFilter}>
@@ -231,16 +231,16 @@ export function MovementHistory({ onViewChange }: MovementHistoryProps) {
               />
             </div>
           </div>
-          
+
           <div className="flex gap-4 mt-4">
-            <Button 
-              variant="outline" 
+            <Button
+              variant="outline"
               onClick={clearFilters}
               className="border-slate-300 text-slate-700 hover:bg-slate-50 rounded-lg"
             >
               Limpiar Filtros
             </Button>
-            <Button 
+            <Button
               onClick={exportToCSV}
               className="bg-green-600 hover:bg-green-700 text-white rounded-lg"
             >
@@ -292,13 +292,12 @@ export function MovementHistory({ onViewChange }: MovementHistoryProps) {
                           </div>
                         </TableCell>
                         <TableCell>
-                          <Badge 
+                          <Badge
                             variant={movement.type === 'entries' ? 'default' : 'destructive'}
-                            className={`rounded-full ${
-                              movement.type === 'entries' 
-                                ? 'bg-green-100 text-green-800 hover:bg-green-100' 
+                            className={`rounded-full ${movement.type === 'entries'
+                                ? 'bg-green-100 text-green-800 hover:bg-green-100'
                                 : 'bg-red-100 text-red-800 hover:bg-red-100'
-                            }`}
+                              }`}
                           >
                             {movement.type === 'entries' ? (
                               <>
@@ -340,12 +339,12 @@ export function MovementHistory({ onViewChange }: MovementHistoryProps) {
                   <Pagination>
                     <PaginationContent>
                       <PaginationItem>
-                        <PaginationPrevious 
+                        <PaginationPrevious
                           onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
                           className={currentPage === 1 ? 'pointer-events-none opacity-50' : 'cursor-pointer'}
                         />
                       </PaginationItem>
-                      
+
                       {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
                         <PaginationItem key={page}>
                           <PaginationLink
@@ -357,9 +356,9 @@ export function MovementHistory({ onViewChange }: MovementHistoryProps) {
                           </PaginationLink>
                         </PaginationItem>
                       ))}
-                      
+
                       <PaginationItem>
-                        <PaginationNext 
+                        <PaginationNext
                           onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
                           className={currentPage === totalPages ? 'pointer-events-none opacity-50' : 'cursor-pointer'}
                         />
@@ -374,7 +373,7 @@ export function MovementHistory({ onViewChange }: MovementHistoryProps) {
               <Package className="h-12 w-12 text-slate-400 mx-auto mb-4" />
               <h3 className="text-slate-600 text-lg font-medium mb-2">No hay registros</h3>
               <p className="text-slate-500">
-                {movements.length === 0 
+                {movements.length === 0
                   ? 'Aún no se han registrado movimientos de inventario'
                   : 'No hay registros que coincidan con los filtros aplicados'
                 }

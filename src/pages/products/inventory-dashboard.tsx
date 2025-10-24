@@ -1,14 +1,14 @@
 import { useState, useRef, useEffect } from "react";
 import { Plus, Package, TrendingDown, Eye, Edit, History } from "lucide-react";
-import { Button } from "./ui/button";
-import { Input } from "./ui/input";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "./ui/table";
-import { Badge } from "./ui/badge";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "./ui/card";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "./ui/dialog";
-import { ScrollArea } from "./ui/scroll-area";
-import PaginationControls from "./common/paginationControls";
-import { ImageWithFallback } from "./figma/ImageWithFallback";
+import { Button } from "../../components/ui/button";
+import { Input } from "../../components/ui/input";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "../../components/ui/table";
+import { Badge } from "../../components/ui/badge";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../../components/ui/card";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "../../components/ui/dialog";
+import { ScrollArea } from "../../components/ui/scroll-area";
+import PaginationControls from "../../components/common/paginationControls";
+import { ImageWithFallback } from "../../components/figma/ImageWithFallback";
 import axios from "axios";
 import { toast } from "sonner";
 interface Product {

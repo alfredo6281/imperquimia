@@ -1,17 +1,17 @@
 // App.tsx
 import { BrowserRouter, Routes, Route, Navigate, useLocation, useNavigate } from "react-router-dom";
 import { Toaster } from "./components/ui/sonner";
-import { Sidebar } from "./components/sidebar";
-import { InventoryDashboard } from "./components/inventory-dashboard";
-import { AddProduct } from "./components/add-product";
-import { InventoryMovements } from "./components/inventory-movements";
-import { MovementHistory } from "./components/movement-history";
-import { Reports } from "./components/reports";
-import { QuotesHistory } from "./components/quotes-history";
-import { CustomersManagement } from "./components/customers/customers-management";
-import { NewQuote } from "./components/new-quote";
-import { SaleHistory } from "./components/sale-history";
-import { NewSale } from "./components/new-sale";
+import { Sidebar } from "./pages/sidebar";
+import { InventoryDashboard } from "./pages/products/inventory-dashboard";
+import { AddProduct } from "./pages/products/add-product";
+import { InventoryMovements } from "./pages/movements/inventory-movements";
+import { MovementHistory } from "./pages/movements/movement-history";
+import { Reports } from "./pages/reports";
+import { QuotesHistory } from "./pages/quotes/quotes-history";
+import { CustomersManagement } from "./pages/customers/customers-management";
+import { NewQuote } from "./pages/quotes/new-quote";
+import { SaleHistory } from "./pages/sales/sale-history";
+import { NewSale } from "./pages/sales/new-sale";
 import { CreditCard } from "lucide-react";
 
 export default function App() {

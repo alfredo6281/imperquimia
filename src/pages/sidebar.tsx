@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Package, FileBarChart, FileText, Users, User, LogOut, ShoppingCart, ReceiptText } from "lucide-react";
-import { Button } from "./ui/button";
+import { Button } from "../components/ui/button";
 import { toast } from "sonner";
 
 interface SidebarProps {

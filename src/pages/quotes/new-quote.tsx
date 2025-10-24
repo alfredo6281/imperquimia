@@ -1,14 +1,14 @@
 import { useState, useEffect } from "react";
 import { ArrowLeft, Plus, Trash2, Save, Calculator, FileText, Search, UserPlus, X, Download, ShoppingCart, Package } from "lucide-react";
-import { Button } from "./ui/button";
-import { Input } from "./ui/input";
-import { Label } from "./ui/label";
-import { Textarea } from "./ui/textarea";
-import { Checkbox } from "./ui/checkbox";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "./ui/select";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "./ui/card";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "./ui/table";
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "./ui/dialog";
+import { Button } from "../../components/ui/button";
+import { Input } from "../../components/ui/input";
+import { Label } from "../../components/ui/label";
+import { Textarea } from "../../components/ui/textarea";
+import { Checkbox } from "../../components/ui/checkbox";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../../components/ui/select";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../../components/ui/card";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "../../components/ui/table";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "../../components/ui/dialog";
 import { toast } from "sonner";
 
 interface NewQuoteProps {
@@ -450,18 +450,7 @@ export function NewQuote({ onViewChange }: NewQuoteProps) {
         basePayload.iva = taxAmount;
         toast.info("Generando PDF...");
       } else {
-        // mano de obra: mapeo directo de laborData
-        /*basePayload.sistema = laborData.system ?? "";
-        basePayload.acabado = laborData.finish ?? "";
-        basePayload.superficie = laborData.surface ?? "";
-        basePayload.estimacion = laborData.estimation ?? "";
-        basePayload.anticipo = Number(laborData.advance) || 0;
-        basePayload.saldo = Number(laborData.balance) || 0;
-        basePayload.garantia = laborData.warranty ?? "";
-        basePayload.precio = Number(laborData.price) || 0;*/
-
         // Deja un array "manoobra" para luego detallar líneas/partidas de trabajo
-
         basePayload.manoObra = [
           {
             descripcion: laborData.description ?? "",

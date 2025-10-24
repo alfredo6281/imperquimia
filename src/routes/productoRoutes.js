@@ -2,12 +2,7 @@ import express from "express";
 import multer from "multer";
 import path from "path";
 import fs from "fs";
-import {
-  getProductos,
-  createProducto,
-  updateStock,
-  uploadImage,
-} from "../controllers/productoController.js";
+import { getProductos, createProducto, updateStock, uploadImage } from "../controllers/productoController.js";
 
 const router = express.Router();
 const __dirname = path.resolve();

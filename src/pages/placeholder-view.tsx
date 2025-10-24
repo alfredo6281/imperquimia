@@ -1,5 +1,5 @@
 import { Construction } from "lucide-react";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "./ui/card";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../components/ui/card";
 
 interface PlaceholderViewProps {
   title: string;

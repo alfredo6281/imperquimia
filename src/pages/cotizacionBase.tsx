@@ -1,12 +1,12 @@
 import { useState, useEffect } from "react";
-import { ArrowLeft, FileText, Search, Filter, Download, Eye, ShoppingCart, Trash2, Plus } from "lucide-react";
-import { Button } from "./ui/button";
-import { Input } from "./ui/input";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "./ui/select";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "./ui/card";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "./ui/table";
-import { Badge } from "./ui/badge";
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "./ui/dialog";
+import { ArrowLeft, FileText, Search, Filter, Download, Eye, ShoppingCart, Trash2 } from "lucide-react";
+import { Button } from "../components/ui/button";
+import { Input } from "../components/ui/input";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../components/ui/select";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../components/ui/card";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "../components/ui/table";
+import { Badge } from "../components/ui/badge";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "../components/ui/dialog";
 import { toast } from "sonner";
 
 interface QuotesHistoryProps {
@@ -189,18 +189,69 @@ export function QuotesHistory({ onViewChange }: QuotesHistoryProps) {
     setShowDetailModal(true);
   };
 
+  const totalQuotes = quotes.length;
+  const pendingQuotes = quotes.filter(q => q.status === "Pendiente").length;
+  const acceptedQuotes = quotes.filter(q => q.status === "Aceptada").length;
+  const totalAmount = quotes.reduce((sum, quote) => sum + quote.total, 0);
+
   return (
     <div className="flex-1 p-6">
       <div className="mb-6 flex items-center gap-4">
+        <Button 
+          variant="outline" 
+          onClick={() => onViewChange('sales')}
+          className="border-slate-300 text-slate-700 hover:bg-slate-50 rounded-lg"
+        >
+          <ArrowLeft className="h-4 w-4 mr-2" />
+          Volver a Ventas
+        </Button>
         <div className="flex items-center gap-3">
           <FileText className="h-6 w-6 text-blue-600" />
           <div>
             <h2 className="text-slate-800 text-2xl font-semibold">Historial de Cotizaciones</h2>
+            <p className="text-slate-600">Gestiona y convierte cotizaciones a ventas</p>
           </div>
         </div>
       </div>
 
-      
+      {/* Tarjetas de resumen */}
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-6">
+        <Card className="border-slate-200 rounded-lg">
+          <CardHeader className="pb-3">
+            <CardTitle className="text-slate-700">Total Cotizaciones</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p className="text-2xl font-semibold text-slate-800">{totalQuotes}</p>
+          </CardContent>
+        </Card>
+
+        <Card className="border-slate-200 rounded-lg">
+          <CardHeader className="pb-3">
+            <CardTitle className="text-slate-700">Pendientes</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p className="text-2xl font-semibold text-yellow-600">{pendingQuotes}</p>
+          </CardContent>
+        </Card>
+
+        <Card className="border-slate-200 rounded-lg">
+          <CardHeader className="pb-3">
+            <CardTitle className="text-slate-700">Aceptadas</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p className="text-2xl font-semibold text-green-600">{acceptedQuotes}</p>
+          </CardContent>
+        </Card>
+
+        <Card className="border-slate-200 rounded-lg">
+          <CardHeader className="pb-3">
+            <CardTitle className="text-slate-700">Valor Total</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p className="text-2xl font-semibold text-blue-600">${totalAmount.toFixed(2)}</p>
+          </CardContent>
+        </Card>
+      </div>
 
       {/* Acciones principales, búsqueda y filtros */}
       <div className="flex flex-wrap gap-4 mb-6 items-center">
@@ -208,7 +259,7 @@ export function QuotesHistory({ onViewChange }: QuotesHistoryProps) {
           onClick={() => onViewChange('new-quote')}
           className="bg-blue-600 hover:bg-blue-700 text-white rounded-lg"
         >
-          <Plus className="h-4 w-4 mr-2" />
+          <FileText className="h-4 w-4 mr-2" />
           Nueva Cotización
         </Button>
         <Button 
@@ -221,7 +272,6 @@ export function QuotesHistory({ onViewChange }: QuotesHistoryProps) {
         </Button>
         
         {/* Búsqueda */}
-        
         <div className="flex-1 min-w-64 relative">
           <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-slate-400" />
           <Input
@@ -265,6 +315,7 @@ export function QuotesHistory({ onViewChange }: QuotesHistoryProps) {
                 <TableHead>Fecha</TableHead>
                 <TableHead>Cliente</TableHead>
                 <TableHead>Total</TableHead>
+                <TableHead>Validez</TableHead>
                 <TableHead>Estado</TableHead>
                 <TableHead>Acciones</TableHead>
               </TableRow>
@@ -281,6 +332,11 @@ export function QuotesHistory({ onViewChange }: QuotesHistoryProps) {
                     <TableCell>{new Date(quote.date).toLocaleDateString()}</TableCell>
                     <TableCell>{quote.clientName}</TableCell>
                     <TableCell className="font-semibold">${quote.total.toFixed(2)}</TableCell>
+                    <TableCell>
+                      <span className={isExpired ? "text-red-600" : "text-green-600"}>
+                        {isExpired ? "Expirada" : `${quote.validDays} días`}
+                      </span>
+                    </TableCell>
                     <TableCell>
                       <Badge className={getStatusColor(quote.status)}>
                         {quote.status}
@@ -348,6 +404,9 @@ export function QuotesHistory({ onViewChange }: QuotesHistoryProps) {
                 </div>
                 <div>
                   <strong>Fecha:</strong> {new Date(selectedQuote.date).toLocaleDateString()}
+                </div>
+                <div>
+                  <strong>Validez:</strong> {selectedQuote.validDays} días
                 </div>
                 <div>
                   <strong>Estado:</strong> 

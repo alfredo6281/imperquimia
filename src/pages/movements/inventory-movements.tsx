@@ -1,9 +1,9 @@
 import { useState, useEffect } from "react";
 import { ArrowLeft, Save, Package, TrendingUp, TrendingDown, Search } from "lucide-react";
-import { Button } from "./ui/button";
-import { Input } from "./ui/input";
-import { Label } from "./ui/label";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "./ui/card";
+import { Button } from "../../components/ui/button";
+import { Input } from "../../components/ui/input";
+import { Label } from "../../components/ui/label";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../../components/ui/card";
 
 import { toast } from "sonner";
 
@@ -12,6 +12,9 @@ interface Product {
   nombre: string;
   categoria:string;
   stock: number;
+  tipo: string;
+  unidad: number;
+  unidadMedida: string;
   URLImagen: string;
 }
 interface InventoryMovementsProps {
@@ -33,7 +36,7 @@ export function InventoryMovements({ onViewChange, movementType }: InventoryMove
 
 
   useEffect(() => {
-    fetch("http://localhost:5000/producto")   // <--- tu endpoint del server.js
+    fetch("http://localhost:5000/api/producto")   // <--- tu endpoint del server.js
       .then((res) => res.json())
       .then((data) => {
         setProducts(data);
@@ -79,8 +82,8 @@ export function InventoryMovements({ onViewChange, movementType }: InventoryMove
     try {
       const url =
         formData.movementType === "entries"
-          ? `http://localhost:5000/producto/${formData.idProducto}/aumentar-stock`
-          : `http://localhost:5000/producto/${formData.idProducto}/disminuir-stock`;
+          ? `http://localhost:5000/api/producto/${formData.idProducto}/aumentar-stock`
+          : `http://localhost:5000/api/producto/${formData.idProducto}/disminuir-stock`;
 
       const res = await fetch(url, {
         method: "PUT",
@@ -191,7 +194,7 @@ export function InventoryMovements({ onViewChange, movementType }: InventoryMove
                           
                         />
                         <div className="flex-1">
-                          <p className="text-sm font-medium text-slate-700">{product.nombre}</p>
+                          <p className="text-sm font-medium text-slate-700">{product.nombre} {product.tipo} {product.unidad}{product.unidadMedida}</p>
                           <p className="text-xs text-slate-500">Stock: {product.stock} • Categoría: {product.categoria}</p>
                         </div>
                       </div>

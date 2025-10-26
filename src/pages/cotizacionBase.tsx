@@ -400,7 +400,7 @@ export function QuotesHistory({ onViewChange }: QuotesHistoryProps) {
             <div className="space-y-4">
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <strong>Cliente:</strong> {selectedQuote.clientName}
+                  <strong>Cliente:</strong> <strong>{selectedQuote.clientId}</strong>{selectedQuote.clientName}
                 </div>
                 <div>
                   <strong>Fecha:</strong> {new Date(selectedQuote.date).toLocaleDateString()}

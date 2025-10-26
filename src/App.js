@@ -6,6 +6,7 @@ import productoRoutes from "./routes/productoRoutes.js";
 import clienteRoutes from "./routes/clienteRoutes.js";
 import movimientosRoutes from "./routes/movimientosRoutes.js";
 import cotizacionRoutes from "./routes/cotizacionRoutes.js";
+import pdfRoutes from "./routes/pdfRoutes.js"
 
 const app = express();
 const __dirname = path.resolve();
@@ -18,6 +19,7 @@ app.use("/api", clienteRoutes);
 app.use("/api", movimientosRoutes);
 app.use('/pdf', express.static(path.join(process.cwd(), 'src/pdf')));
 app.use('/api', cotizacionRoutes);
+app.use('/api', pdfRoutes);
 
 
 

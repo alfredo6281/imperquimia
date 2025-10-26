@@ -8,16 +8,18 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from ".
 import { Badge } from "../../components/ui/badge";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "../../components/ui/dialog";
 import { toast } from "sonner";
+import { usePdfGenerator } from "../../hooks/usePdfGenerator";
 import axios from "axios";
 interface QuotesHistoryProps {
   onViewChange: (view: string) => void;
 }
-interface Quoute {
+interface Quote {
   idCotizacion: number;
   fecha: string;
   total: number;
   tipo: string;
   estado: string;
+  idCliente: number;
   cliente: string;
   usuario: string;
   nota: string;
@@ -35,15 +37,30 @@ interface DetailsQuoute {
   unidad: number;
   unidadMedida: string;
 }
+interface QuoteLabor {
+  idCotizacionMa: number;
+  fecha: string;
+  descripcion: string;
+  sistema: string;
+  acabado: string;
+  superficie: number;
+  precio: number;
+  anticipo: number;
+  saldo: number;
+  garantia: number;
+  estado: string;
+  nota: string;
+}
 export function QuotesHistory({ onViewChange }: QuotesHistoryProps) {
   const [searchTerm, setSearchTerm] = useState("");
   const [filterStatus, setFilterStatus] = useState("all");
   const [currentPage, setCurrentPage] = useState(1);
   const [sortColumn, setSortColumn] = useState<string | null>(null);
   const [sortDirection, setSortDirection] = useState<"asc" | "desc">("asc");
-  const [quotes, setQuotes] = useState<Quoute[]>([]);
+  const [quotes, setQuotes] = useState<Quote[]>([]);
   const [detailsQuotes, setdetailsQuotes] = useState<DetailsQuoute[]>([]);
-  const [selectedQuote, setSelectedQuote] = useState<Quoute | null>(null);
+  const [selectedQuoteLabor, setSelectedQuoteLabor] = useState<QuoteLabor | null>(null);
+  const [selectedQuote, setSelectedQuote] = useState<Quote | null>(null);
   const [selectedDetailQuote, setDetailSelectedQuote] = useState<DetailsQuoute | null>(null);
   const [showDetailModal, setShowDetailModal] = useState(false);
   const [itemsPerPage] = useState(10);
@@ -108,9 +125,9 @@ export function QuotesHistory({ onViewChange }: QuotesHistoryProps) {
         return "bg-red-100 text-red-800";
       case "Convertida a Venta":
         return "bg-blue-100 text-blue-800";
-      case "true":
+      case "Material":
         return "bg-green-100 text-green-800";
-      case "false":
+      case "Mano de obra":
         return "bg-blue-100 text-blue-800";
       default:
         return "bg-gray-100 text-gray-800";
@@ -151,11 +168,131 @@ export function QuotesHistory({ onViewChange }: QuotesHistoryProps) {
     toast.success("Cotización convertida a venta");
     onViewChange('new-sale');
   };
+  const [quoteType, setQuoteType] = useState<"materials" | "labor">("materials");
 
-  const generatePDF = (quote: any) => {
-    toast.success(`Generando PDF de cotización ${quote.id}...`);
-    // Aquí implementarías la generación real del PDF
+  const { generate } = usePdfGenerator();
+  // sustituye la función generatePDF existente por esta
+  const generatePDF = async (quoteParam?: Quote) => {
+    const quote = quoteParam ?? selectedQuote;
+    if (!quote) {
+      toast.error("Selecciona una cotización para generar el PDF");
+      return;
+    }
+
+    // Determinar tipo (ajusta si tu backend usa otro valor)
+    const tipoRaw = (quote.tipo ?? "").toString().toLowerCase();
+    const quoteType: "materials" | "labor" =
+      tipoRaw === "false" || tipoRaw.includes("mano") || tipoRaw.includes("labor")
+        ? "labor"
+        : "materials";
+
+    // Obtener detalles: usa los ya cargados en estado o pídelos al backend si no están
+    let relevantDetails: DetailsQuoute[] = detailsQuotes.filter(d => d.idCotizacion === quote.idCotizacion);
+
+    if (quoteType === "materials" && relevantDetails.length === 0) {
+      // pedir detalles al backend porque no están en memoria
+      try {
+        const res = await axios.get(`http://localhost:5000/api/cotizacion/detalle/${quote.idCotizacion}`);
+        relevantDetails = res.data ?? [];
+        // opcional: actualizar estado para que el modal los muestre si el usuario lo abre después
+        setdetailsQuotes(prev => {
+          // evitar duplicados: reemplazamos detalles del mismo idCotizacion
+          const other = prev.filter(d => d.idCotizacion !== quote.idCotizacion);
+          return [...other, ...relevantDetails];
+        });
+      } catch (err) {
+        console.error("Error al obtener detalles para generar PDF:", err);
+        toast.error("No se pudieron cargar los detalles de la cotización para generar el PDF");
+        return;
+      }
+    }
+
+    // Construir formData mínimo para el PDF
+    const formDataForPdf = {
+      quoteId: String(quote.idCotizacion ?? `C${Date.now()}`),
+      clientId: String(quote.idCliente),
+      clientName: quote.cliente ?? "",
+      clientAddress: (quote as any).domicilio ?? "",
+      clientPhone: (quote as any).telefono ?? "",
+      clientEmail: (quote as any).correo ?? "",
+      notes: (quote as any).nota ?? "",
+      discount: Number((quote as any).discount ?? 0),
+      tax: Number((quote as any).tax ?? 0),
+    };
+
+    // Mapear los detalles a items esperados por el hook
+    const itemsForPdf = (relevantDetails ?? [])
+      .map((d) => {
+        const cantidad = Number(d.cantidad ?? 0);
+        const precio = Number(d.precio ?? 0);
+        const computedSubtotal = +(cantidad * precio);
+        const subtotal = d.subtotal != null ? Number(d.subtotal) : computedSubtotal;
+
+        return {
+          productId: String(d.idProducto ?? ""),
+          productName: d.producto ?? "",
+          color: "", // si DetailsQuoute tiene color, úsalo
+          unity: d.unidad ?? 0,
+          unitMed: d.unidadMedida ?? "",
+          quantity: cantidad,
+          unitPrice: precio,
+          subtotal,
+        };
+      });
+
+    // Datos para mano de obra (si aplica)
+    const laborDataForPdf = {
+      description: (quote as any).nota ?? "",
+      system: (quote as any).tipo ?? "Mano de obra",
+      finish: (quote as any).acabado ?? "",
+      surface: Number((quote as any).superficie ?? 0),
+      price: Number((quote as any).precio ?? quote.total ?? 0),
+      estimation: Number((quote as any).estimacion ?? quote.total ?? 0),
+      advance: Number((quote as any).anticipo ?? 0),
+      balance: Number((quote as any).saldo ?? 0),
+      warranty: (quote as any).garantia ?? "",
+    };
+
+    // Cálculos
+    const subtotalCalc = quoteType === "materials"
+      ? itemsForPdf.reduce((s, it) => s + (Number(it.subtotal) || 0), 0)
+      : Number((quote as any).subtotal ?? (quote.total ?? 0));
+
+    const taxAmount = Number((quote as any).tax ?? 0);
+    const totalCalc = Number(quote.total ?? subtotalCalc + taxAmount);
+    const date = quote.fecha
+      ? new Date(quote.fecha).toLocaleDateString("es-MX", { day: "numeric", month: "long", year: "numeric" })
+      : new Date().toLocaleDateString("es-MX", { day: "numeric", month: "long", year: "numeric" });
+
+    try {
+      const url = await generate(
+        {
+          quoteType,
+          formData: formDataForPdf,
+          items: quoteType === "materials" ? itemsForPdf : undefined,
+          laborData: quoteType === "labor" ? laborDataForPdf : undefined,
+          note: (quote as any).nota ?? "",
+          subtotal: subtotalCalc,
+          total: totalCalc,
+          date,
+          taxAmount,
+        } as any, // puedes tiparlo si prefieres
+        {
+          onStart: () => toast.info("Generando PDF..."),
+          onSuccess: () => toast.success("PDF generado con éxito"),
+          onError: (e) => toast.error(e.message || "Error al generar PDF"),
+        }
+      );
+
+      window.open(url, "_blank");
+      toast.success(`PDF listo: COT-${quote.idCotizacion}`);
+    } catch (err) {
+      console.error("Error al generar PDF:", err);
+      toast.error((err as Error)?.message ?? "Error al generar PDF");
+    }
   };
+
+
 
   const deleteQuote = (quoteId: string) => {
     const updatedQuotes = quotes.filter(q => q.idCotizacion.toString() !== quoteId);
@@ -164,20 +301,42 @@ export function QuotesHistory({ onViewChange }: QuotesHistoryProps) {
     toast.success("Cotización eliminada");
   };
 
-  const viewQuoteDetail = async (quote: Quoute) => {
+  const viewQuoteDetail = async (quote: Quote) => {
     try {
+      // limpiar cualquier detalle previo
+      setdetailsQuotes([]);
+      setSelectedQuoteLabor(null);
+
+      // guardamos la cotización seleccionada (comunes)
       setSelectedQuote(quote);
       setShowDetailModal(true);
 
-      const res = await axios.get(
-        `http://localhost:5000/api/cotizacion/detalle/${quote.idCotizacion}`
-      );
+      // detectar si es mano de obra (misma heurística que en generatePDF)
+      const tipoRaw = (quote.tipo ?? "").toString().toLowerCase();
+      const isLabor =
+        tipoRaw === "false" || tipoRaw.includes("mano") || tipoRaw.includes("labor");
 
-      setdetailsQuotes(res.data);
+      if (!isLabor) {
+        // materiales -> endpoint de detalles (array)
+        const res = await axios.get(`http://localhost:5000/api/cotizacion/detalle/${quote.idCotizacion}`);
+        const details = res.data ?? [];
+        setdetailsQuotes(Array.isArray(details) ? details : []);
+      } else {
+        // mano de obra -> endpoint específico (objeto o array)
+        const res = await axios.get(`http://localhost:5000/api/cotizacion/mano/${quote.idCotizacion}`);
+        const data = res.data;
+        // el backend podría devolver un array o un objeto; normalizamos a objeto o null
+        const labor = Array.isArray(data) ? (data[0] ?? null) : data ?? null;
+        setSelectedQuoteLabor(labor);
+        // asegurarnos de no mostrar details de materiales
+        setdetailsQuotes([]);
+      }
     } catch (err) {
       console.error("Error al obtener detalles de cotización:", err);
+      toast.error("No se pudieron cargar los detalles de la cotización");
     }
   };
+
 
   return (
     <div className="flex-1 p-6">
@@ -231,7 +390,6 @@ export function QuotesHistory({ onViewChange }: QuotesHistoryProps) {
             <SelectContent>
               <SelectItem value="all">Todos los estados</SelectItem>
               <SelectItem value="pendiente">Pendiente</SelectItem>
-              <SelectItem value="aceptada">Aceptada</SelectItem>
               <SelectItem value="rechazada">Rechazada</SelectItem>
               <SelectItem value="convertida a venta">Convertida a Venta</SelectItem>
             </SelectContent>
@@ -272,7 +430,7 @@ export function QuotesHistory({ onViewChange }: QuotesHistoryProps) {
                     <TableCell className="font-medium">COT-{quote.idCotizacion}</TableCell>
                     <TableCell>
                       <Badge className={getStatusColor(quote.tipo.toString())}>
-                        {quote.tipo.toString() === "true" ? "Material" : "Mano de obra"}
+                        {quote.tipo.toString() === "Material" ? "Material" : "Mano de obra"}
                       </Badge>
                     </TableCell>
                     <TableCell>{new Date(quote.fecha).toLocaleDateString()}</TableCell>
@@ -302,6 +460,7 @@ export function QuotesHistory({ onViewChange }: QuotesHistoryProps) {
                         >
                           <Download className="h-3 w-3" />
                         </Button>
+                        {/*
                         {(quote.estado === "Pendiente" || quote.estado === "Aceptada") && (
                           <Button
                             size="sm"
@@ -319,6 +478,7 @@ export function QuotesHistory({ onViewChange }: QuotesHistoryProps) {
                         >
                           <Trash2 className="h-3 w-3" />
                         </Button>
+                        */}
                       </div>
                     </TableCell>
                   </TableRow>
@@ -342,7 +502,7 @@ export function QuotesHistory({ onViewChange }: QuotesHistoryProps) {
             <div className="space-y-4">
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <strong>Cliente:</strong> {selectedQuote.cliente}
+                  <strong>Cliente:</strong> {selectedQuote.idCliente} - {selectedQuote.cliente}
                 </div>
                 <div>
                   <strong>Fecha:</strong> {new Date(selectedQuote.fecha).toLocaleDateString()}
@@ -354,34 +514,57 @@ export function QuotesHistory({ onViewChange }: QuotesHistoryProps) {
                   </Badge>
                 </div>
               </div>
-              {/* Productos */}
-              <div>
-                <strong>Productos:</strong>
-                <Table className="mt-2">
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Producto</TableHead>
-                      <TableHead>Cantidad</TableHead>
-                      <TableHead>Precio</TableHead>
-                      <TableHead>Subtotal</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    
-                    {detailsQuotes.map((item) => {
-                      return (
-                        <TableRow key={selectedQuote.idCotizacion}>
-                          <TableCell>{item.producto} {item.tipo} {item.unidad}{item.unidadMedida}</TableCell>
-                          <TableCell>{item.cantidad}</TableCell>
-                          <TableCell>${Number(item.precio ?? 0).toFixed(2)}</TableCell>
-                          <TableCell>${Number(item.subtotal ?? 0).toFixed(2)}</TableCell>
+              {(selectedQuote.tipo ?? "").toString().toLowerCase().includes("material") ? (
+                <>
+                  {/* Productos */}
+                  <div>
+                    <strong>Productos:</strong>
+                    <Table className="mt-2">
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Producto</TableHead>
+                          <TableHead>Cantidad</TableHead>
+                          <TableHead>Precio</TableHead>
+                          <TableHead>Subtotal</TableHead>
                         </TableRow>
-                      )
-                    })}
-                  </TableBody>
-                </Table>
-              </div>
+                      </TableHeader>
+                      <TableBody>
 
+                        {detailsQuotes.map((item) => {
+                          return (
+                            <TableRow key={selectedQuote.idCotizacion}>
+                              <TableCell>{item.producto} {item.tipo} {item.unidad}{item.unidadMedida}</TableCell>
+                              <TableCell>{item.cantidad}</TableCell>
+                              <TableCell>${Number(item.precio ?? 0).toFixed(2)}</TableCell>
+                              <TableCell>${Number(item.subtotal ?? 0).toFixed(2)}</TableCell>
+                            </TableRow>
+                          )
+                        })}
+                      </TableBody>
+                    </Table>
+                  </div>
+                </>
+              ) : (
+                <>{/* Detalle Cotizacion */}
+                  {selectedQuoteLabor && (
+                    <div>
+                      <strong>Detalle de Mano de Obra:</strong>
+                      <div className="mt-2">
+                        <div>{/*<strong>Descripción:</strong> {(selectedQuoteLabor as any).nota ?? "-"}*/}</div>
+                        <div><strong>Sistema:</strong> {selectedQuoteLabor.sistema ?? "-"}</div>
+                        <div><strong>Acabado:</strong> {(selectedQuoteLabor as any).acabado ?? "-"}</div>
+                        <div><strong>Superficie:</strong> {Number((selectedQuoteLabor as any).superficie ?? 0)} m2</div>
+                        <div><strong>Precio m2:</strong> ${Number((selectedQuoteLabor as any).precio ?? 0)}</div>
+                        <div><strong>Estimacion: (por unidad/superficie):</strong> ${Number(selectedQuoteLabor.precio * selectedQuoteLabor.superficie).toFixed(2)} Neto</div>
+                        <div><strong>Anticipo:</strong> {Number((selectedQuoteLabor as any).anticipo ?? 0)}%</div>
+                        <div><strong>Saldo:</strong> {Number((selectedQuoteLabor as any).saldo ?? 0)}%</div>
+                        <div><strong>Garantia:</strong> {Number((selectedQuoteLabor as any).garantia ?? 0)} años</div>
+                      </div>
+                    </div>
+                  )}
+                </>
+
+              )}
               <div className="grid grid-cols-2 gap-4 pt-4 border-t">
                 <div>
                   <strong>Subtotal:</strong> ${selectedQuote.total.toFixed(2)}
@@ -439,6 +622,6 @@ export function QuotesHistory({ onViewChange }: QuotesHistoryProps) {
           )}
         </DialogContent>
       </Dialog>
-    </div>
+    </div >
   );
 }

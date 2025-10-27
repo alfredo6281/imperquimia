@@ -279,7 +279,7 @@ export function CustomersManagement({ onViewChange }: { onViewChange?: (v: strin
 
   const [searchTerm, setSearchTerm] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
-  const itemsPerPage = 5;
+  const itemsPerPage = 7;
 
   // modales
   const [viewDetailsOpen, setViewDetailsOpen] = useState(false);

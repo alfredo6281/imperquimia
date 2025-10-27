@@ -1,20 +1,17 @@
 import sql from "mssql";
 import { pool } from "../config/db.js";
-/*
-////////////////////////////////////////////////
---------------------CRUD-----------------------
-////////////////////////////////////////////////
-*/
-export const getDetallesCotizacion = async (req, res) => {
-  const { id } = req.params; // viene del endpoint /api/cotizacion/:id
 
+/**
+ * Obtiene los detalles (productos) de una cotización
+ * GET /cotizacion/detalle/:id
+ */
+export const getDetallesCotizacion = async (req, res) => {
+  const { id } = req.params;
   try {
-    if (!id) {
-      return res.status(400).json({ error: "Falta el ID de la cotización" });
-    }
+    if (!id) return res.status(400).json({ error: "Falta el ID de la cotización" });
 
     const result = await pool.request()
-      .input("idCotizacion", sql.Int, id)
+      .input("idCotizacion", sql.Int, Number(id))
       .query(`
         SELECT 
           p.nombre AS producto,
@@ -26,24 +23,27 @@ export const getDetallesCotizacion = async (req, res) => {
           p.unidad,
           p.unidadMedida
         FROM cotizacion c
-        INNER JOIN detalleCotizacion dc 
-            ON c.idCotizacion = dc.idCotizacion
-        INNER JOIN producto p 
-            ON dc.idProducto = p.idProducto
+        INNER JOIN detalleCotizacion dc ON c.idCotizacion = dc.idCotizacion
+        LEFT JOIN producto p ON dc.idProducto = p.idProducto
         WHERE c.idCotizacion = @idCotizacion;
       `);
 
     res.json(result.recordset);
   } catch (err) {
-    res.status(500).send(err.message);
+    console.error("getDetallesCotizacion error:", err);
+    res.status(500).json({ error: err.message });
   }
 };
 
+/**
+ * Lista cotizaciones (materiales + mano de obra) - combinado
+ * GET /cotizacion
+ */
 export const getCotizacion = async (req, res) => {
   try {
-    const result = await pool.request()
-      .query(`
-      SELECT 
+    const result = await pool.request().query(`
+      SELECT * FROM (
+        SELECT 
           c.idCotizacion AS idCotizacion,
           c.fecha,
           c.total,
@@ -52,14 +52,14 @@ export const getCotizacion = async (req, res) => {
           cli.nombre as cliente,
           u.usuario as usuario,
           c.nota,
-        'Material' AS tipo
-      FROM cotizacion AS c
-      INNER JOIN Cliente AS cli ON c.idCliente = cli.idCliente
-      INNER JOIN Usuario AS u ON c.idUsuario = u.idUsuario
+          'Material' AS tipo
+        FROM cotizacion AS c
+        INNER JOIN Cliente AS cli ON c.idCliente = cli.idCliente
+        INNER JOIN Usuario AS u ON c.idUsuario = u.idUsuario
 
-      UNION ALL
+        UNION ALL
 
-      SELECT 
+        SELECT 
           m.idCotizacionMa AS idCotizacion,
           m.fecha,
           CAST(m.precio * m.superficie AS DECIMAL(12,2)) AS total,
@@ -68,85 +68,305 @@ export const getCotizacion = async (req, res) => {
           cli.nombre as cliente,
           u.usuario as usuario,
           m.nota,
-        'Mano de obra' AS tipo
-      FROM cotizacionMa AS m
-      INNER JOIN Cliente AS cli ON m.idCliente = cli.idCliente
-      INNER JOIN Usuario AS u ON m.idUsuario = u.idUsuario
+          'Mano de obra' AS tipo
+        FROM cotizacionMa AS m
+        INNER JOIN Cliente AS cli ON m.idCliente = cli.idCliente
+        INNER JOIN Usuario AS u ON m.idUsuario = u.idUsuario
+      ) AS t
+      ORDER BY idCotizacion DESC;
+    `);
 
-      ORDER BY c.idCotizacion DESC;`);
     res.json(result.recordset);
   } catch (err) {
-    res.status(500).send(err.message);
+    console.error("getCotizacion error:", err);
+    res.status(500).json({ error: err.message });
   }
 };
-export const createCotizacion = async (req, res) => {
-  const {
-    fecha,
-    total,
-    tipo,
-    estado,
-    idCliente,
-    idUsuario,
-    nota,
-  } = req.body;
 
+/**
+ * Crear una cotización simple (cabecera únicamente)
+ * -- NO recomendado si necesitas detalles: mejor usar crearCotizacion (cabecera + detalles)
+ * POST /cotizacion/simple  (si decides usarlo)
+ */
+export const createCotizacionSimple = async (req, res) => {
   try {
-    const result = await pool
-      .request()
-      .input("fecha", sql.date, fecha)
-      .input("total", sql.Decimal(12, 2), total)
-      .input("tipo", sql.bit, tipo)
+    const { total = 0, estado = "Pendiente", idCliente, idUsuario, nota = "" } = req.body;
+    if (!idCliente) return res.status(400).json({ error: "Falta idCliente" });
+    if (!idUsuario) return res.status(400).json({ error: "Falta idUsuario" });
+
+    const result = await pool.request()
+      .input("total", sql.Decimal(12, 2), Number(total) || 0)
       .input("estado", sql.NVarChar(20), estado)
-      .input("idCliente", sql.Int, idCliente)
-      .input("idUsuario", sql.Int, idUsuario)
+      .input("idCliente", sql.Int, Number(idCliente))
+      .input("idUsuario", sql.Int, Number(idUsuario))
       .input("nota", sql.NVarChar(300), nota)
       .query(`
-        INSERT INTO Producto (fecha, total, tipo, estado, idCliente, idUsuario, nota)
-        
-        VALUES (@fecha, @total, @tipo, @estado, @idCliente, @idUsuario, @nota)
+        INSERT INTO cotizacion (fecha, total, estado, idCliente, idUsuario, nota)
+        VALUES (GETDATE(), @total, @estado, @idCliente, @idUsuario, @nota);
+        SELECT SCOPE_IDENTITY() AS idCotizacion;
       `);
-    //No se usa porque el codigo se pone manual, se usa la siguiente linea cuando el id se pone automatico
-    //const idProducto = result.recordset[0].idProducto;
-    res.status(201).json({ message: "Cotizacion creada correctamente", idProducto });
+
+    const idCotizacion = result.recordset?.[0]?.idCotizacion;
+    return res.status(201).json({ success: true, idCotizacion });
   } catch (err) {
-    console.error("❌ Error al crear cotizacion:", err, "cotizacion:", idProducto);
-    res.status(500).json({ error: "Error al insertar cotizacion" });
+    console.error("createCotizacionSimple error:", err);
+    res.status(500).json({ error: err.message });
   }
 };
 
+/**
+ * Obtener cotización de mano de obra por id
+ * GET /cotizacion/mano/:id
+ */
 export const getCotizacionManoObra = async (req, res) => {
-  const { id } = req.params; // viene del endpoint /api/cotizacion/:id
+  const { id } = req.params;
   try {
-    if (!id) {
-      return res.status(400).json({ error: "Falta el ID de la cotización" });
-    }
+    if (!id) return res.status(400).json({ error: "Falta el ID de la cotización" });
+
     const result = await pool.request()
-      .input("idCotizacion", sql.Int, id)
+      .input("idCotizacion", sql.Int, Number(id))
       .query(`
-      SELECT 
-        c.idCotizacionMa,
-        c.descripcion,
-        c.sistema,
-        c.fecha, 
-        c.acabado,
-        c.superficie,
-        c.precio,
-        c.superficie * c.precio as subtotal, 
-        c.anticipo,
-        c.saldo,
-        c.garantia,
-        c.estado, 
-        c.nota, 
-        cli.nombre as cliente, 
-        u.usuario AS usuario 
-      FROM cotizacionMa c 
-        INNER JOIN Cliente cli 
-          ON c.idCliente = cli.idCliente 
-        INNER JOIN Usuario u 
-          ON c.idUsuario = u.idUsuario 
-      WHERE c.idCotizacionMa = @idCotizacion;`);
+        SELECT 
+          c.idCotizacionMa,
+          c.descripcion,
+          c.sistema,
+          c.fecha, 
+          c.acabado,
+          c.superficie,
+          c.precio,
+          c.superficie * c.precio as subtotal, 
+          c.anticipo,
+          c.saldo,
+          c.garantia,
+          c.estado, 
+          c.nota, 
+          cli.nombre as cliente, 
+          u.usuario AS usuario 
+        FROM cotizacionMa c 
+        INNER JOIN Cliente cli ON c.idCliente = cli.idCliente 
+        INNER JOIN Usuario u ON c.idUsuario = u.idUsuario 
+        WHERE c.idCotizacionMa = @idCotizacion;
+      `);
+
     res.json(result.recordset);
   } catch (err) {
-    res.status(500).send(err.message);
+    console.error("getCotizacionManoObra error:", err);
+    res.status(500).json({ error: err.message });
+  }
+};
+
+/* -------------------------
+   Detalle: insertar 1 registro
+   POST /detalleCotizacion
+   body: { idCotizacion, idProducto|null, cantidad, precioUnitario }
+   ------------------------- */
+export const createDetalleCotizacion = async (req, res) => {
+  try {
+    const { idCotizacion, idProducto = null, cantidad = 0, precioUnitario = 0 } = req.body;
+
+    if (!idCotizacion) return res.status(400).json({ error: "Falta idCotizacion" });
+
+    const reqDb = pool.request();
+    reqDb.input("idCotizacion", sql.Int, Number(idCotizacion));
+    // si idProducto es null lo pasamos como null
+    reqDb.input("idProducto", sql.Int, idProducto == null ? null : Number(idProducto));
+    reqDb.input("cantidad", sql.Int, Number(cantidad) || 0);
+    reqDb.input("precioUnitario", sql.Decimal(12, 2), Number(precioUnitario) || 0);
+
+    await reqDb.query(`
+      INSERT INTO detalleCotizacion (idCotizacion, idProducto, cantidad, precioUnitario)
+      VALUES (@idCotizacion, @idProducto, @cantidad, @precioUnitario);
+    `);
+
+    return res.status(201).json({ success: true });
+  } catch (err) {
+    console.error("createDetalleCotizacion error:", err);
+    return res.status(500).json({ error: err.message });
+  }
+};
+
+/* -------------------------
+   Detalle: insertar en batch (transacción)
+   POST /detalleCotizacion/batch
+   body: { idCotizacion?, detalles: [ { idCotizacion?, idProducto, cantidad, precioUnitario }, ... ] }
+   ------------------------- */
+export const createDetalleCotizacionBatch = async (req, res) => {
+  const { idCotizacion: globalId, detalles } = req.body;
+
+  if (!Array.isArray(detalles) || detalles.length === 0) {
+    return res.status(400).json({ error: "Debe enviar 'detalles' como array no vacío" });
+  }
+
+  const transaction = new sql.Transaction(pool);
+  try {
+    await transaction.begin();
+
+    for (const d of detalles) {
+      const idCot = globalId ?? d.idCotizacion;
+      if (!idCot) {
+        await transaction.rollback();
+        return res.status(400).json({ error: "Falta idCotizacion en el batch (global o por item)" });
+      }
+
+      const reqIns = new sql.Request(transaction);
+      const idProductoVal = d.idProducto != null ? Number(d.idProducto) : null;
+
+      reqIns.input("idCotizacion", sql.Int, Number(idCot));
+      reqIns.input("idProducto", sql.Int, idProductoVal);
+      reqIns.input("cantidad", sql.Int, Number(d.cantidad) || 0);
+      reqIns.input("precioUnitario", sql.Decimal(12, 2), Number(d.precioUnitario || 0));
+
+      await reqIns.query(`
+        INSERT INTO detalleCotizacion (idCotizacion, idProducto, cantidad, precioUnitario)
+        VALUES (@idCotizacion, @idProducto, @cantidad, @precioUnitario);
+      `);
+    }
+
+    await transaction.commit();
+    return res.status(201).json({ success: true, inserted: detalles.length });
+  } catch (err) {
+    console.error("createDetalleCotizacionBatch error:", err);
+    try { await transaction.rollback(); } catch (rbErr) { console.error("Rollback error:", rbErr); }
+    return res.status(500).json({ error: err.message });
+  }
+};
+
+/* -------------------------
+   Crear cotizacion + detalles en una sola petición
+   POST /cotizacion/crear
+   body: { total, idCliente, idUsuario, nota, detalles: [ { idProducto|null, cantidad, precioUnitario } ] }
+   ------------------------- */
+export const crearCotizacion = async (req, res) => {
+  // aceptar dos shapes: { total, idCliente, idUsuario, nota, detalles }
+  // o { cotizacion: { total, idCliente, idUsuario, nota }, detalles }
+  let { total, idCliente, idUsuario, nota, detalles } = req.body;
+
+  if (req.body && req.body.cotizacion && typeof req.body.cotizacion === 'object') {
+    const c = req.body.cotizacion;
+    total = total ?? c.total;
+    idCliente = idCliente ?? c.idCliente;
+    idUsuario = idUsuario ?? c.idUsuario;
+    nota = nota ?? c.nota;
+    detalles = detalles ?? req.body.detalles ?? c.detalles;
+  }
+
+  // validaciones
+  if (!idCliente) return res.status(400).json({ error: "Falta idCliente" });
+  if (!idUsuario) return res.status(400).json({ error: "Falta idUsuario" });
+  if (!Array.isArray(detalles) || detalles.length === 0) {
+    return res.status(400).json({ error: "Debe enviar al menos un detalle" });
+  }
+
+  const transaction = new sql.Transaction(pool);
+  try {
+    await transaction.begin();
+
+    const reqInsert = new sql.Request(transaction);
+    reqInsert.input("total", sql.Decimal(12, 2), Number(total) || 0);
+    reqInsert.input("estado", sql.NVarChar(20), "Pendiente");
+    reqInsert.input("idCliente", sql.Int, Number(idCliente));
+    reqInsert.input("idUsuario", sql.Int, Number(idUsuario));
+    reqInsert.input("nota", sql.NVarChar(300), nota ?? "");
+
+    const insertCot = await reqInsert.query(`
+      INSERT INTO cotizacion (fecha, total, estado, idCliente, idUsuario, nota)
+      OUTPUT INSERTED.idCotizacion
+      VALUES (GETDATE(), @total, @estado, @idCliente, @idUsuario, @nota);
+    `);
+
+    // log del resultado para debug
+    console.log("insertCot.recordset:", insertCot.recordset);
+
+    const idCotizacion = insertCot.recordset?.[0]?.idCotizacion;
+    if (!idCotizacion) {
+      await transaction.rollback();
+      console.error("crearCotizacion: no se obtuvo idCotizacion. Result:", insertCot);
+      return res.status(500).json({ error: "No se obtuvo idCotizacion" });
+    }
+
+    // insertar detalles
+    for (const d of detalles) {
+      const reqDet = new sql.Request(transaction);
+      const idProductoVal = d.idProducto != null ? Number(d.idProducto) : null;
+
+      reqDet.input("idCotizacion", sql.Int, Number(idCotizacion));
+      reqDet.input("idProducto", sql.Int, idProductoVal);
+      reqDet.input("cantidad", sql.Int, Number(d.cantidad) || 0);
+      reqDet.input("precioUnitario", sql.Decimal(12, 2), Number(d.precioUnitario || 0));
+
+      await reqDet.query(`
+        INSERT INTO detalleCotizacion (idCotizacion, idProducto, cantidad, precioUnitario)
+        VALUES (@idCotizacion, @idProducto, @cantidad, @precioUnitario);
+      `);
+    }
+
+    await transaction.commit();
+    return res.status(201).json({ success: true, idCotizacion });
+  } catch (err) {
+    console.error("crearCotizacion error:", err);
+    try { await transaction.rollback(); } catch (rbErr) { console.error("Rollback error:", rbErr); }
+    return res.status(500).json({ error: err.message ?? "Error al crear cotización" });
+  }
+};
+
+
+/* -------------------------
+   Alternativa: crear cotizacion con estructura { cotizacion, detalles }
+   POST /cotizacion/con-detalles
+   ------------------------- */
+export const createCotizacionConDetalles = async (req, res) => {
+  const { cotizacion, detalles } = req.body;
+
+  if (!cotizacion || typeof cotizacion !== "object") {
+    return res.status(400).json({ error: "Falta objeto 'cotizacion' en body" });
+  }
+  if (!Array.isArray(detalles) || detalles.length === 0) {
+    return res.status(400).json({ error: "Debe enviar al menos un detalle" });
+  }
+
+  const transaction = new sql.Transaction(pool);
+  try {
+    await transaction.begin();
+
+    const reqIns = new sql.Request(transaction);
+    reqIns.input("total", sql.Decimal(12, 2), Number(cotizacion.total) || 0);
+    reqIns.input("estado", sql.NVarChar(20), cotizacion.estado || "Pendiente");
+    reqIns.input("idCliente", sql.Int, Number(cotizacion.idCliente));
+    reqIns.input("idUsuario", sql.Int, Number(cotizacion.idUsuario));
+    reqIns.input("nota", sql.NVarChar(300), cotizacion.nota ?? null);
+
+    const insertCot = await reqIns.query(`
+      INSERT INTO cotizacion (fecha, total, estado, idCliente, idUsuario, nota)
+      VALUES (GETDATE(), @total, @estado, @idCliente, @idUsuario, @nota);
+      SELECT SCOPE_IDENTITY() AS idCotizacion;
+    `);
+
+    const idCotizacion = insertCot.recordset?.[0]?.idCotizacion;
+    if (!idCotizacion) {
+      await transaction.rollback();
+      return res.status(500).json({ error: "No se pudo obtener idCotizacion" });
+    }
+
+    for (const d of detalles) {
+      const reqDet = new sql.Request(transaction);
+      const idProductoVal = d.idProducto != null ? Number(d.idProducto) : null;
+
+      reqDet.input("idCotizacion", sql.Int, Number(idCotizacion));
+      reqDet.input("idProducto", sql.Int, idProductoVal);
+      reqDet.input("cantidad", sql.Int, Number(d.cantidad) || 0);
+      reqDet.input("precioUnitario", sql.Decimal(12, 2), Number(d.precioUnitario || 0));
+
+      await reqDet.query(`
+        INSERT INTO detalleCotizacion (idCotizacion, idProducto, cantidad, precioUnitario)
+        VALUES (@idCotizacion, @idProducto, @cantidad, @precioUnitario);
+      `);
+    }
+
+    await transaction.commit();
+    return res.status(201).json({ success: true, idCotizacion });
+  } catch (err) {
+    console.error("createCotizacionConDetalles error:", err);
+    try { await transaction.rollback(); } catch (rbErr) { console.error("Rollback err:", rbErr); }
+    return res.status(500).json({ error: err.message ?? "Error al crear cotización" });
   }
 };

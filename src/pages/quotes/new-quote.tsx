@@ -12,6 +12,8 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, Di
 import { toast } from "sonner";
 import { usePdfGenerator } from "../../hooks/usePdfGenerator";
 import type { PdfPayload } from "../../types/quotes";
+const API_BASE = import.meta.env.REACT_APP_API_URL ?? "http://localhost:5000/api";
+
 interface NewQuoteProps {
   onViewChange: (view: string) => void;
 }
@@ -137,7 +139,7 @@ export function NewQuote({ onViewChange }: NewQuoteProps) {
   useEffect(() => {
     const loadClients = async () => {
       try {
-        const res = await fetch("http://localhost:5000/api/cliente");
+        const res = await fetch(`${API_BASE}/cliente`);
         if (!res.ok) throw new Error("Error cargando clientes");
         const data = await res.json();
         // mapea los campos del backend (idCliente, nombre, telefono, correo, direccion)
@@ -164,7 +166,7 @@ export function NewQuote({ onViewChange }: NewQuoteProps) {
   const [products, setProducts] = useState<Product[]>([]);
 
   useEffect(() => {
-    fetch("http://localhost:5000/api/producto")
+    fetch(`${API_BASE}/producto`)
       .then((res) => res.json())
       .then((data) => setProducts(data))
       .catch((err) => console.error("Error cargando productos:", err));
@@ -206,7 +208,7 @@ export function NewQuote({ onViewChange }: NewQuoteProps) {
 
     try {
       // petición al servidor
-      const res = await fetch("http://localhost:5000/api/cliente", {
+      const res = await fetch(`${API_BASE}/api/cliente`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -516,37 +518,105 @@ export function NewQuote({ onViewChange }: NewQuoteProps) {
     onViewChange('new-sale');
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+
+    // Validaciones cliente / items
     if (!formData.clientId) { toast.error("Selecciona un cliente"); return; }
-    if (items.length === 0) { toast.error("Agrega al menos un producto"); return; }
+    if (quoteType === "materials" && items.length === 0) { toast.error("Agrega al menos un producto"); return; }
+    if (quoteType === "labor" && !laborData.system?.trim()) { toast.error("Completa la información de mano de obra"); return; }
 
-    const itemsToSave = prepareItemsForExport();
-    const subtotalSave = itemsToSave.reduce((s, it) => s + (it.subtotal || 0), 0);
-    const taxSave = +(subtotalSave * ((Number(formData.tax) || 0) / 100)).toFixed(2);
-    const totalSave = +(subtotalSave + taxSave).toFixed(2);
+    try {
+      toast.loading("Guardando cotización...");
 
-    const quoteData = {
-      id: `COT-${Date.now()}`,
-      clientId: formData.clientId,
-      clientName: formData.clientName,
-      items: itemsToSave,
-      subtotal: subtotalSave,
-      discount: formData.discount,
-      tax: formData.tax,
-      total: totalSave,
-      notes: formData.notes,
-      date: new Date().toISOString().split('T')[0],
-      status: 'Pendiente'
-    };
+      // Preparar items/totales
+      const itemsForSave = prepareItemsForExport();
+      const subtotalSave = itemsForSave.reduce((s, it) => s + (Number(it.subtotal) || 0), 0);
+      const taxSave = +(subtotalSave * ((Number(formData.tax) || 0) / 100)).toFixed(2);
+      const totalSave = +(subtotalSave + taxSave).toFixed(2);
 
-    const existingQuotes = JSON.parse(localStorage.getItem('quotes') || '[]');
-    existingQuotes.push(quoteData);
-    localStorage.setItem('quotes', JSON.stringify(existingQuotes));
+      // Mano de obra si aplica
+      const laborTotal = quoteType === "labor"
+        ? Number(laborData.estimation ?? (Number(laborData.surface || 0) * Number(laborData.price || 0))) || 0
+        : 0;
 
-    toast.success("Cotización creada exitosamente");
-    setTimeout(() => onViewChange('quotes-history'), 1000);
+      const totalToSend = quoteType === "materials" ? totalSave : laborTotal;
+      const idUsuario = Number(localStorage.getItem("userId") || 1);
+
+      // Construir array de detalles
+      let detallePayload: Array<{ idProducto: number | null; cantidad: number; precioUnitario: number }> = [];
+      if (quoteType === "materials") {
+        detallePayload = itemsForSave.map(it => ({
+          idProducto: it.productId ? Number(it.productId) : null,
+          cantidad: Number(it.quantity) || 0,
+          // guardamos el precio unitario con descuento (si aplica) o el precio normal
+          precioUnitario: Number(it.discountedUnitPrice ?? it.unitPrice) || 0
+        }));
+      } else {
+        // Mano de obra => un detalle con idProducto = null
+        detallePayload = [{
+          idProducto: null,
+          cantidad: 1,
+          precioUnitario: Number(laborTotal) || 0
+        }];
+      }
+
+      if (!detallePayload.length) {
+        throw new Error("Debe enviar al menos un detalle");
+      }
+
+      // Body plano que espera el backend
+      const body = {
+        total: totalToSend,
+        idCliente: Number(formData.clientId),
+        idUsuario,
+        nota: formData.notes || nota || "",
+        detalles: detallePayload
+      };
+
+      // Petición única al servidor
+      const res = await fetch(`${API_BASE}/cotizacion/crear`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body)
+      });
+
+      if (!res.ok) {
+        // intentar leer JSON con error primero, si falla leer texto
+        let serverMsg = null;
+        try {
+          const j = await res.json().catch(() => null);
+          if (j) serverMsg = j.error ?? j.message ?? JSON.stringify(j);
+        } catch (_) { /* ignore */ }
+        if (!serverMsg) {
+          try { serverMsg = await res.text(); } catch (_) { serverMsg = String(res.status); }
+        }
+        throw new Error(serverMsg || "Error creando cotización en el servidor");
+      }
+
+      const data = await res.json().catch(() => ({} as any));
+      // extraer idCotizacion de posibles formatos de respuesta
+      const idCotizacion = data?.idCotizacion ?? data?.id ?? data?.insertId ?? (data?.result && data.result.idCotizacion);
+      if (!idCotizacion) {
+        // si el servidor respondió ok pero no trajo id, muestra el objeto para debug
+        console.error("Respuesta servidor crear cotizacion (sin id):", data);
+        throw new Error("El servidor no devolvió el id de la cotización");
+      }
+
+      toast.success("Cotización guardada correctamente");
+      setFormData(prev => ({ ...prev, quoteId: Number(idCotizacion) }));
+      // redirigir al historial o lo que prefieras
+      setTimeout(() => onViewChange("quotes-history"), 800);
+    } catch (err: any) {
+      console.error("handleSubmit error:", err);
+      // Mostrar mensaje claro al usuario
+      const msg = err?.message || "Error guardando la cotización";
+      toast.error(msg);
+    }
   };
+
+
+
 
   const selectedClient = clients.find(c => c.id === formData.clientId);
 
@@ -1074,7 +1144,7 @@ export function NewQuote({ onViewChange }: NewQuoteProps) {
               </CardHeader>
               <CardContent className="space-y-4">
                 <Label htmlFor="description" className="text-slate-700">
-                  Envió presupuesto de impermeabilización de: 
+                  Envió presupuesto de impermeabilización de:
                 </Label>
                 <Input
                   id="description"

@@ -7,7 +7,7 @@
 import { useCallback } from "react";
 import type { PdfPayload, PdfItem, FormDataType, LaborDataType } from "../types/quotes";
 export type QuoteType = "materials" | "labor";
-
+import { calculateTotals } from "../utils/calculateTotals";
 export interface GenerateOptions {
   onStart?: () => void;
   onSuccess?: (url: string) => void;
@@ -20,14 +20,18 @@ function buildPayload(payload: PdfPayload) {
   const {
     quoteType,
     formData,
-    items,
+    items = [],
     laborData,
     note,
-    subtotal,
-    total,
     date,
-    taxAmount,
   } = payload;
+  // 🔹 Calcular totales automáticamente (evita depender de la BD o props)
+  const { subtotal, iva, total } = calculateTotals(
+    items.map((i) => ({
+      cantidad: i.quantity,
+      precio: i.discountedUnitPrice ?? i.unitPrice,
+    })),
+  );
 
   const basePayload: any = {
     quoteType,
@@ -38,9 +42,10 @@ function buildPayload(payload: PdfPayload) {
     telefono: formData.clientPhone,
     correo: formData.clientEmail,
     nota: note,
+    date,
     subtotal,
     total,
-    date,
+    iva,
   };
 
   if (quoteType === "materials") {
@@ -69,10 +74,6 @@ function buildPayload(payload: PdfPayload) {
         precio: precioDescuento,
       };
     });
-
-
-
-    basePayload.iva = taxAmount;
   } else {
     basePayload.manoObra = [
       {

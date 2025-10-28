@@ -486,7 +486,7 @@ export const createPdf = async (req, res) => {
     // Carpeta y archivo
     const folderPath = path.join(process.cwd(), "src/pdf/cotizaciones");
     await fs.ensureDir(folderPath);
-    const fileName = `C-${numero}.pdf`;
+    const fileName = `C-${idCotizacion}.pdf`;
     const filePath = path.join(folderPath, fileName);
 
     // Crear PDF y guardarlo a disco

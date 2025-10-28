@@ -1,6 +1,6 @@
 import express from "express";
 import {
-  getCotizacion, getDetallesCotizacion, getCotizacionManoObra, crearCotizacion,
+  getCotizacion, getDetallesCotizacion, getCotizacionManoObra, createCotizacionManoObra ,crearCotizacion,
   createDetalleCotizacion, createDetalleCotizacionBatch, createCotizacionConDetalles
 } from "../controllers/cotizacionController.js";
 
@@ -10,6 +10,7 @@ const router = express.Router();
 router.get("/cotizacion", getCotizacion);
 router.get("/cotizacion/detalle/:id", getDetallesCotizacion);
 router.get("/cotizacion/mano/:id", getCotizacionManoObra);
+router.post("/cotizacion/crear/manoObra", createCotizacionManoObra);
 
 // crear cotizacion (cabecera + detalles en una sola petición)
 router.post("/cotizacion/crear", crearCotizacion);

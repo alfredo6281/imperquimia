@@ -4,13 +4,15 @@ import {
   getCliente,
   createCliente,
   editCliente,
+  getDetalleCliente,
 } from "../controllers/clienteController.js";
 
 const router = express.Router();
 
 router.get("/cliente", getCliente);
-router.post("/cliente", createCliente)
+router.get("/cliente/detalle/:id", getDetalleCliente);
+router.post("/cliente", createCliente);
 router.delete("/cliente/:id", deleteCliente);
-router.put("/cliente/:id", editCliente)
+router.put("/cliente/:id", editCliente);
 
 export default router;

@@ -9,7 +9,22 @@ export const getCliente = async (req, res) => {
     res.status(500).send(err.message);
   }
 };
-
+export const getDetalleCliente = async (req, res) => {
+  const { id } = req.params;
+  if (!id) {
+    return res.status(400).json({ error: "Falta el ID del cliente" });
+  }
+  try {
+    const result = await pool
+      .request()
+      .input("idCliente", sql.Int, id)
+      .query("SELECT * FROM Cliente where idCliente = @idCliente");
+    res.json(result.recordset);
+  } catch (err) {
+    console.error("Error getDetalleCliente:", err);
+    res.status(500).send(err.message);
+  }
+};
 export const deleteCliente = async (req, res) => {
   const { id } = req.params;
   try {

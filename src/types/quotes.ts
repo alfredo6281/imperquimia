@@ -8,9 +8,6 @@ export interface FormDataType {
   clientAddress: string;
   clientPhone: string;
   clientEmail: string;
-  notes: string;
-  discount: number;
-  tax: number;
 }
 
 /** Información adicional de mano de obra o sistemas */
@@ -40,7 +37,7 @@ export interface QuoteItem {
   quantity: number;
   subtotal: number;
   discount: number;
-  notes: string;
+
 }
 
 /** Item tal como se exportará en el PDF */
@@ -58,6 +55,7 @@ export interface PdfPayload {
   note: string;
   subtotal: number;
   total: number;
+  iva: number;
   date: string;
   taxAmount: number;
 }

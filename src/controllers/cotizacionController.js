@@ -21,7 +21,8 @@ export const getDetallesCotizacion = async (req, res) => {
           dc.idProducto,
           p.tipo,
           p.unidad,
-          p.unidadMedida
+          p.unidadMedida,
+          p.color
         FROM cotizacion c
         INNER JOIN detalleCotizacion dc ON c.idCotizacion = dc.idCotizacion
         LEFT JOIN producto p ON dc.idProducto = p.idProducto
@@ -46,7 +47,7 @@ export const getCotizacion = async (req, res) => {
         SELECT 
           c.idCotizacion AS idCotizacion,
           c.fecha,
-          c.total,
+          COALESCE(v.total, 0) AS total, 
           c.estado,
           cli.idCliente,
           cli.nombre as cliente,
@@ -56,6 +57,7 @@ export const getCotizacion = async (req, res) => {
         FROM cotizacion AS c
         INNER JOIN Cliente AS cli ON c.idCliente = cli.idCliente
         INNER JOIN Usuario AS u ON c.idUsuario = u.idUsuario
+        LEFT JOIN dbo.vwCotizacionTotals v ON v.idCotizacion = c.idCotizacion
 
         UNION ALL
 
@@ -154,7 +156,41 @@ export const getCotizacionManoObra = async (req, res) => {
     res.status(500).json({ error: err.message });
   }
 };
+export const createCotizacionManoObra = async (req, res) => {
+  try {
+    const { estado = "Pendiente", idCliente, idUsuario, nota,
+      descripcion, sistema, acabado, superficie, precio, anticipo, saldo, garantia } = req.body;
+    if (!idCliente) return res.status(400).json({ error: "Falta idCliente" });
+    if (!idUsuario) return res.status(400).json({ error: "Falta idUsuario" });
 
+    const result = await pool.request()
+      .input("descripcion", sql.NVarChar, descripcion)
+      .input("sistema", sql.NVarChar(50), sistema)
+      .input("acabado", sql.NVarChar(20), acabado)
+      .input("superficie", sql.Decimal(12, 2), superficie)
+      .input("precio", sql.Decimal(12, 2), precio)
+      .input("anticipo", sql.Int, anticipo)
+      .input("saldo", sql.Int, saldo)
+      .input("garantia", sql.Int, garantia)
+      .input("estado", sql.NVarChar(20), estado)
+      .input("nota", sql.NVarChar(300), nota)
+      .input("idCliente", sql.Int, Number(idCliente))
+      .input("idUsuario", sql.Int, Number(idUsuario))
+      .query(`
+        INSERT INTO cotizacionMa (fecha, descripcion, sistema, acabado, superficie, 
+        precio, anticipo, saldo, garantia, idCliente, idUsuario, nota, estado)
+        OUTPUT INSERTED.idCotizacionMa
+        VALUES (GETDATE(), @descripcion, @sistema, @acabado, @superficie, @precio, @anticipo, 
+        @saldo, @garantia, @idCliente, @idUsuario, @nota, @estado);
+      `);
+
+    const idCotizacionMa = result.recordset?.[0]?.idCotizacionMa;
+    return res.status(201).json({ success: true, idCotizacionMa });
+  } catch (err) {
+    console.error("createCotizacionManoObra error:", err);
+    res.status(500).json({ error: err.message });
+  }
+};
 /* -------------------------
    Detalle: insertar 1 registro
    POST /detalleCotizacion

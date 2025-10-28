@@ -58,15 +58,7 @@ export function NewQuote({ onViewChange }: NewQuoteProps) {
     tax: 16,
   });
   const DEFAULT_LABOR = {
-    /*description: "losa de azotea",
-    system: "Elastomerico c/malla Reforzada",
-    finish: "Blanco o Rojo",
-    surface: 85,
-    price: 172.00,
-    estimation: 0,
-    advance: 70,
-    balance: 30,
-    warranty: "4",*/
+    quoteLaborId: 0,
     description: "",
     system: "",
     finish: "",
@@ -74,8 +66,9 @@ export function NewQuote({ onViewChange }: NewQuoteProps) {
     price: 0,
     estimation: 0,
     advance: 70,
-    balance: 30,
+    balance: 40,
     warranty: "",
+    note: "",
   };
   // Datos específicos para cotización de mano de obra
   const [laborData, setLaborData] = useState(() => ({ ...DEFAULT_LABOR }));
@@ -92,6 +85,7 @@ export function NewQuote({ onViewChange }: NewQuoteProps) {
   // --- Reseteo específico para mano de obra ---
   const resetLabor = () => {
     setLaborData({
+      quoteLaborId: 0,
       description: "",
       system: "",
       finish: "",
@@ -100,7 +94,8 @@ export function NewQuote({ onViewChange }: NewQuoteProps) {
       estimation: 0,
       advance: 70,
       balance: 30,
-      warranty: ""
+      warranty: "",
+      note: "",
     });
   };
 
@@ -431,27 +426,27 @@ export function NewQuote({ onViewChange }: NewQuoteProps) {
 
 
   const { generate } = usePdfGenerator();
-  const generatePDF = async () => {
+  const generatePDF = async (quoteId?: number) => {
     try {
       const itemsForPdf = prepareItemsForExport();
-
-      // recalcula totales por si acaso (opcional, pero consistente)
       const subtotalMaterialsForPdf = itemsForPdf.reduce((s, it) => s + (it.subtotal || 0), 0);
       const taxAmountForPdf = quoteType === "materials"
         ? +(subtotalMaterialsForPdf * ((Number(formData.tax) || 0) / 100)).toFixed(2)
         : 0;
       const totalForPdf = quoteType === "materials"
         ? +(subtotalMaterialsForPdf + taxAmountForPdf).toFixed(2)
-        : subtotal; // conserva comportamiento existente para labor
+        : subtotal;
 
+      const iva = 0.16;
       const payload: PdfPayload = {
         quoteType,
-        formData,
+        formData: { ...formData, quoteId: quoteId ?? formData.quoteId },
         items: itemsForPdf,
         laborData,
         note: nota,
         subtotal: subtotalMaterialsForPdf,
         total: totalForPdf,
+        iva: subtotalMaterialsForPdf * iva,
         date,
         taxAmount: taxAmountForPdf,
       };
@@ -461,12 +456,13 @@ export function NewQuote({ onViewChange }: NewQuoteProps) {
       });
 
       window.open(url, "_blank");
-      toast.success(`Generando PDF de cotización ${formData.clientId}...`);
+      toast.success(`Generando PDF de cotización ${quoteId ?? formData.quoteId}...`);
     } catch (e) {
       console.error(e);
       toast.error("Error generando PDF");
     }
   };
+
 
 
 
@@ -527,86 +523,133 @@ export function NewQuote({ onViewChange }: NewQuoteProps) {
     if (quoteType === "labor" && !laborData.system?.trim()) { toast.error("Completa la información de mano de obra"); return; }
 
     try {
-      toast.loading("Guardando cotización...");
-
-      // Preparar items/totales
-      const itemsForSave = prepareItemsForExport();
-      const subtotalSave = itemsForSave.reduce((s, it) => s + (Number(it.subtotal) || 0), 0);
-      const taxSave = +(subtotalSave * ((Number(formData.tax) || 0) / 100)).toFixed(2);
-      const totalSave = +(subtotalSave + taxSave).toFixed(2);
-
-      // Mano de obra si aplica
-      const laborTotal = quoteType === "labor"
-        ? Number(laborData.estimation ?? (Number(laborData.surface || 0) * Number(laborData.price || 0))) || 0
-        : 0;
-
-      const totalToSend = quoteType === "materials" ? totalSave : laborTotal;
+      //toast.loading("Guardando cotización...");
       const idUsuario = Number(localStorage.getItem("userId") || 1);
-
-      // Construir array de detalles
-      let detallePayload: Array<{ idProducto: number | null; cantidad: number; precioUnitario: number }> = [];
       if (quoteType === "materials") {
-        detallePayload = itemsForSave.map(it => ({
-          idProducto: it.productId ? Number(it.productId) : null,
-          cantidad: Number(it.quantity) || 0,
-          // guardamos el precio unitario con descuento (si aplica) o el precio normal
-          precioUnitario: Number(it.discountedUnitPrice ?? it.unitPrice) || 0
-        }));
-      } else {
-        // Mano de obra => un detalle con idProducto = null
-        detallePayload = [{
-          idProducto: null,
-          cantidad: 1,
-          precioUnitario: Number(laborTotal) || 0
-        }];
-      }
+        // Preparar items/totales
+        const itemsForSave = prepareItemsForExport();
+        const subtotalSave = itemsForSave.reduce((s, it) => s + (Number(it.subtotal) || 0), 0);
+        const taxSave = +(subtotalSave * ((Number(formData.tax) || 0) / 100)).toFixed(2);
+        const totalSave = +(subtotalSave + taxSave).toFixed(2);
+        const totalToSend = quoteType === "materials" ? totalSave : null;
 
-      if (!detallePayload.length) {
-        throw new Error("Debe enviar al menos un detalle");
-      }
-
-      // Body plano que espera el backend
-      const body = {
-        total: totalToSend,
-        idCliente: Number(formData.clientId),
-        idUsuario,
-        nota: formData.notes || nota || "",
-        detalles: detallePayload
-      };
-
-      // Petición única al servidor
-      const res = await fetch(`${API_BASE}/cotizacion/crear`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(body)
-      });
-
-      if (!res.ok) {
-        // intentar leer JSON con error primero, si falla leer texto
-        let serverMsg = null;
-        try {
-          const j = await res.json().catch(() => null);
-          if (j) serverMsg = j.error ?? j.message ?? JSON.stringify(j);
-        } catch (_) { /* ignore */ }
-        if (!serverMsg) {
-          try { serverMsg = await res.text(); } catch (_) { serverMsg = String(res.status); }
+        // Construir array de detalles
+        let detallePayload: Array<{ idProducto: number | null; cantidad: number; precioUnitario: number }> = [];
+        if (quoteType === "materials") {
+          detallePayload = itemsForSave.map(it => ({
+            idProducto: it.productId ? Number(it.productId) : null,
+            cantidad: Number(it.quantity) || 0,
+            // guardamos el precio unitario con descuento (si aplica) o el precio normal
+            precioUnitario: Number(it.discountedUnitPrice ?? it.unitPrice) || 0
+          }));
         }
-        throw new Error(serverMsg || "Error creando cotización en el servidor");
-      }
 
-      const data = await res.json().catch(() => ({} as any));
-      // extraer idCotizacion de posibles formatos de respuesta
-      const idCotizacion = data?.idCotizacion ?? data?.id ?? data?.insertId ?? (data?.result && data.result.idCotizacion);
-      if (!idCotizacion) {
-        // si el servidor respondió ok pero no trajo id, muestra el objeto para debug
-        console.error("Respuesta servidor crear cotizacion (sin id):", data);
-        throw new Error("El servidor no devolvió el id de la cotización");
-      }
+        if (!detallePayload.length) {
+          throw new Error("Debe enviar al menos un detalle");
+        }
 
-      toast.success("Cotización guardada correctamente");
-      setFormData(prev => ({ ...prev, quoteId: Number(idCotizacion) }));
-      // redirigir al historial o lo que prefieras
-      setTimeout(() => onViewChange("quotes-history"), 800);
+        // Body plano que espera el backend
+        const body = {
+          total: totalToSend,
+          idCliente: Number(formData.clientId),
+          idUsuario,
+          nota: formData.notes || nota || "",
+          detalles: detallePayload
+        };
+
+        // Petición única al servidor
+        const res = await fetch(`${API_BASE}/cotizacion/crear`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(body)
+        });
+
+        if (!res.ok) {
+          // intentar leer JSON con error primero, si falla leer texto
+          let serverMsg = null;
+          try {
+            const j = await res.json().catch(() => null);
+            if (j) serverMsg = j.error ?? j.message ?? JSON.stringify(j);
+          } catch (_) { /* ignore */ }
+          if (!serverMsg) {
+            try { serverMsg = await res.text(); } catch (_) { serverMsg = String(res.status); }
+          }
+          throw new Error(serverMsg || "Error creando cotización en el servidor");
+        }
+
+        const data = await res.json().catch(() => ({} as any));
+        // extraer idCotizacion de posibles formatos de respuesta
+        const idCotizacion = data?.idCotizacion ?? data?.id ?? data?.insertId ?? (data?.result && data.result.idCotizacion);
+        if (!idCotizacion) {
+          // si el servidor respondió ok pero no trajo id, muestra el objeto para debug
+          console.error("Respuesta servidor crear cotizacion (sin id):", data);
+          throw new Error("El servidor no devolvió el id de la cotización");
+        }
+
+        toast.success("Cotización guardada correctamente");
+        setFormData(prev => ({ ...prev, quoteId: Number(idCotizacion) }));
+
+        // Generar PDF automáticamente
+        await generatePDF(idCotizacion);
+
+        // Redirigir al historial después de generar el PDF
+        setTimeout(() => onViewChange("quote-history"), 1000);
+
+      } else {
+        /*---------------------------------------------- */
+        /*-----------COTIZACION MANO DE OBRA----------- */
+        /*---------------------------------------------- */
+        const response = await fetch(`${API_BASE}/cotizacion/crear/manoObra`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            descripcion: laborData.description,
+            sistema: laborData.system,
+            acabado: laborData.finish,
+            superficie: Number(parseFloat(laborData.surface.toString())),
+            precio: Number(parseFloat(laborData.price.toString())),
+            anticipo: Number(parseFloat(laborData.advance.toString())),
+            saldo: Number(parseFloat(laborData.balance.toString())),
+            garantia: parseInt(laborData.warranty),
+            idCliente: parseInt(formData.clientId, 10),
+            idUsuario: parseInt(idUsuario.toString(), 10),
+            nota: nota,
+          }),
+        });
+        console.log('createCotizacionManoObra body:', response.body);
+        if (!response.ok) {
+          // intentar leer JSON con error primero, si falla leer texto
+          let serverMsg = null;
+          try {
+            const j = await response.json().catch(() => null);
+            if (j) serverMsg = j.error ?? j.message ?? JSON.stringify(j);
+          } catch (_) { /* ignore */ }
+          if (!serverMsg) {
+            try { serverMsg = await response.text(); } catch (_) { serverMsg = String(response.status); }
+          }
+          throw new Error(serverMsg || "Error creando cotización en el servidor");
+        }
+        const data = await response.json().catch(() => ({} as any));
+        // soportar varios nombres posibles por si el backend varía
+        const idCotizacionMa = data.idCotizacionMa ?? data.idCotizacion ?? data.id ?? data.insertId ?? null;
+        if (!idCotizacionMa) {
+          console.error("Respuesta servidor crear cotizacion Mano de obra (sin id):", data);
+          throw new Error("El servidor no devolvió el id de la cotización");
+        }
+
+        toast.success("Cotización guardada correctamente");
+        setLaborData(prev => ({ ...prev, quoteLaborId: Number(idCotizacionMa) }));
+
+        // Generar PDF automáticamente — pásale el id insertado
+        await generatePDF(Number(idCotizacionMa));
+
+        // Redirigir al historial después de generar el PDF
+        setTimeout(() => onViewChange("quote-history"), 1000);
+
+
+
+
+      }
     } catch (err: any) {
       console.error("handleSubmit error:", err);
       // Mostrar mensaje claro al usuario
@@ -1159,27 +1202,51 @@ export function NewQuote({ onViewChange }: NewQuoteProps) {
                     <Label htmlFor="system" className="text-slate-700">
                       Sistema *
                     </Label>
-                    <Input
-                      id="system"
-                      value={laborData.system}
-                      onChange={(e) => handleLaborDataChange("system", e.target.value)}
-                      placeholder="Ej: Elastomerico c/malla Reforzada"
-                      className="rounded-lg border-slate-300"
-                      autoComplete="off"
-                    />
+                    <div className="relative">
+                      <Input
+                        id="system"
+                        value={laborData.system}
+                        onChange={(e) => handleLaborDataChange("system", e.target.value)}
+                        placeholder="Ej: Elastomerico c/malla Reforzada"
+                        className="rounded-lg border-slate-300 pr-16"
+                        autoComplete="off"
+                        maxLength={50}
+                      />
+                      <span className={`absolute right-3 top-1/2 transform -translate-y-1/2 text-xs pointer-events-none 
+                      ${laborData.system.length > 40
+                          ? 'text-red-500'
+                          : laborData.system.length > 25
+                            ? 'text-amber-500'
+                            : 'text-slate-400'
+                        }`}>
+                        {laborData.system.length}/50
+                      </span>
+                    </div>
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="finish" className="text-slate-700">
                       Acabado
                     </Label>
-                    <Input
-                      id="finish"
-                      value={laborData.finish}
-                      onChange={(e) => handleLaborDataChange("finish", e.target.value)}
-                      placeholder="Ej: Blanco o Rojo"
-                      className="rounded-lg border-slate-300"
-                      autoComplete="off"
-                    />
+                    <div className="relative">
+                      <Input
+                        id="finish"
+                        value={laborData.finish}
+                        onChange={(e) => handleLaborDataChange("finish", e.target.value)}
+                        placeholder="Ej: Blanco o Rojo"
+                        className="rounded-lg border-slate-300 pr-16"
+                        autoComplete="off"
+                        maxLength={20}
+                      />
+                      <span className={`absolute right-3 top-1/2 transform -translate-y-1/2 text-xs pointer-events-none 
+                      ${laborData.finish.length > 18
+                          ? 'text-red-500'
+                          : laborData.finish.length > 15
+                            ? 'text-amber-500'
+                            : 'text-slate-400'
+                        }`}>
+                        {laborData.finish.length}/20
+                      </span>
+                    </div>
                   </div>
                 </div>
 
@@ -1256,24 +1323,20 @@ export function NewQuote({ onViewChange }: NewQuoteProps) {
                     <Label htmlFor="warranty" className="text-slate-700">
                       Garantía
                     </Label>
+
                     <Input
                       id="warranty"
+                      autoComplete="off"
+                      type="number"
                       value={laborData.warranty}
                       onChange={(e) => handleLaborDataChange("warranty", e.target.value)}
                       placeholder="Ej: 5"
-                      className="rounded-lg border-slate-300"
-                      autoComplete="off"
+                      className="rounded-lg border-slate-300 pr-16"
                     />
                   </div>
                 </div>
-
-
-
-
               </CardContent>
-
             </Card>
-
           )}
           {/* Información adicional */}
           <Card className="border-slate-200 rounded-lg">
@@ -1380,12 +1443,12 @@ export function NewQuote({ onViewChange }: NewQuoteProps) {
                 >
                   <ShoppingCart className="h-4 w-4 mr-2" />
                   Convertir a Venta
-                </Button>*/}
+                </Button>
 
                 <Button
                   type="button"
                   variant="outline"
-                  onClick={generatePDF}
+                  
                   className="w-full border-slate-300 text-slate-700 hover:bg-slate-50 rounded-lg"
                   disabled={
                     !formData.clientId ||
@@ -1395,7 +1458,7 @@ export function NewQuote({ onViewChange }: NewQuoteProps) {
                 >
                   <Download className="h-4 w-4 mr-2" />
                   Generar PDF
-                </Button>
+                </Button>*/}
 
                 <Button
                   type="button"

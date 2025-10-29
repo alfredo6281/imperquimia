@@ -2,7 +2,7 @@ import express from "express";
 import multer from "multer";
 import path from "path";
 import fs from "fs";
-import { getProductos, createProducto, updateStock, uploadImage } from "../controllers/productoController.js";
+import { getProductos, createProducto, updateStock, uploadImage, editProduct } from "../controllers/productoController.js";
 
 const router = express.Router();
 const __dirname = path.resolve();
@@ -26,5 +26,6 @@ router.post("/producto", createProducto);
 router.put("/producto/:id/aumentar-stock", (req, res) => updateStock(req, res, "aumentar"));
 router.put("/producto/:id/disminuir-stock", (req, res) => updateStock(req, res, "disminuir"));
 router.post("/producto/upload", upload.single("image"), uploadImage);
+router.put("/producto/editar/:id", editProduct);
 
 export default router;

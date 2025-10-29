@@ -53,7 +53,7 @@ export const createProducto = async (req, res) => {
     //const idProducto = result.recordset[0].idProducto;
     res.status(201).json({ message: "Producto agregado correctamente", idProducto });
   } catch (err) {
-    console.error("❌ Error al insertar producto:", err, "producto:",idProducto);
+    console.error("❌ Error al insertar producto:", err, "producto:", idProducto);
     res.status(500).json({ error: "Error al insertar producto" });
   }
 };
@@ -113,5 +113,83 @@ export const uploadImage = async (req, res) => {
   } catch (err) {
     console.error("❌ Error al procesar imagen:", err);
     res.status(500).json({ error: "Error al procesar imagen" });
+  }
+};
+
+export const editProduct = async (req, res) => {
+  const { id } = req.params;
+  if (!id) {
+    return res.status(400).json({ error: "Falta id del producto en la ruta" });
+  }
+
+  // Campos que esperamos en body (todos opcionales — permitimos actualizaciones parciales)
+  const {
+    nombre,
+    categoria,
+    tipo,
+    unidad,
+    unidadMedida,
+    color,
+    precioUnitario,
+    stock,
+    stockMinimo,
+    descripcion,
+    URLImagen,
+  } = req.body ?? {};
+
+  try {
+    // Convertir numéricos si vienen (si no vienen => null para que ISNULL los ignore)
+    const unidadVal = unidad !== undefined && unidad !== "" ? parseInt(unidad, 10) : null;
+    const precioVal = precioUnitario !== undefined && precioUnitario !== "" ? parseFloat(precioUnitario) : null;
+    const stockVal = stock !== undefined && stock !== "" ? parseInt(stock, 10) : null;
+    const stockMinVal = stockMinimo !== undefined && stockMinimo !== "" ? parseInt(stockMinimo, 10) : null;
+
+    const result = await pool
+      .request()
+      .input("idProducto", sql.Int, id)
+      .input("nombre", sql.NVarChar(50), nombre ?? null)
+      .input("categoria", sql.NVarChar(24), categoria ?? null)
+      .input("tipo", sql.NVarChar(10), tipo ?? null)
+      .input("unidad", sql.Int, unidadVal)
+      .input("unidadMedida", sql.NVarChar(10), unidadMedida ?? null)
+      .input("color", sql.NVarChar(15), color ?? null)
+      .input("precioUnitario", sql.Decimal(10, 2), precioVal)
+      .input("stock", sql.Int, stockVal)
+      .input("stockMinimo", sql.Int, stockMinVal)
+      .input("descripcion", sql.NVarChar(500), descripcion ?? null)
+      .input("URLImagen", sql.NVarChar(200), URLImagen ?? null)
+      .query(`
+        UPDATE Producto
+        SET
+          nombre = @nombre,
+          categoria = @categoria,
+          tipo = @tipo,
+          unidad = @unidad,
+          unidadMedida = @unidadMedida,
+          color = @color,
+          precioUnitario = @precioUnitario,
+          stock = @stock,
+          stockMinimo = @stockMinimo,
+          descripcion = @descripcion,
+          URLImagen = @URLImagen
+        WHERE idProducto = @idProducto
+      `);
+
+    // verificar si se afectó alguna fila
+    const rowsAffected = result.rowsAffected?.[0] ?? 0;
+    if (rowsAffected === 0) {
+      return res.status(404).json({ error: `Producto con id ${id} no encontrado` });
+    }
+
+    // devolver el producto actualizado
+    const updated = await pool
+      .request()
+      .input("idProducto", sql.Int, id)
+      .query("SELECT * FROM Producto WHERE idProducto = @idProducto");
+
+    res.json({ success: true, producto: updated.recordset[0] });
+  } catch (err) {
+    console.error("❌ Error al editar producto:", err, "id:", id);
+    res.status(500).json({ error: "Error al editar producto" });
   }
 };

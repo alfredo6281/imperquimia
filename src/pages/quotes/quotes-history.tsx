@@ -1,12 +1,12 @@
 import { useState, useEffect } from "react";
-import { ArrowLeft, FileText, Search, Filter, Download, Eye, ShoppingCart, Trash2, Plus, Quote } from "lucide-react";
+import { FileText, Search, Download, Eye, Plus, Quote } from "lucide-react";
 import { Button } from "../../components/ui/button";
 import { Input } from "../../components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../../components/ui/select";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../../components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "../../components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "../../components/ui/table";
 import { Badge } from "../../components/ui/badge";
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "../../components/ui/dialog";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "../../components/ui/dialog";
 import { toast } from "sonner";
 import { usePdfGenerator } from "../../hooks/usePdfGenerator";
 import axios from "axios";
@@ -60,13 +60,13 @@ export function QuotesHistory({ onViewChange }: QuotesHistoryProps) {
   const [searchTerm, setSearchTerm] = useState("");
   const [filterStatus, setFilterStatus] = useState("all");
   const [currentPage, setCurrentPage] = useState(1);
-  const [sortColumn, setSortColumn] = useState<string | null>(null);
-  const [sortDirection, setSortDirection] = useState<"asc" | "desc">("asc");
+  //const [sortColumn, setSortColumn] = useState<string | null>(null);
+  //const [sortDirection, setSortDirection] = useState<"asc" | "desc">("asc");
   const [quotes, setQuotes] = useState<Quote[]>([]);
   const [detailsQuotes, setdetailsQuotes] = useState<DetailsQuoute[]>([]);
   const [selectedQuoteLabor, setSelectedQuoteLabor] = useState<QuoteLabor | null>(null);
   const [selectedQuote, setSelectedQuote] = useState<Quote | null>(null);
-  const [selectedDetailQuote, setDetailSelectedQuote] = useState<DetailsQuoute | null>(null);
+  //const [selectedDetailQuote, setDetailSelectedQuote] = useState<DetailsQuoute | null>(null);
   const [showDetailModal, setShowDetailModal] = useState(false);
   const itemsPerPage = 6;
   // Datos mock del inventario
@@ -88,7 +88,7 @@ export function QuotesHistory({ onViewChange }: QuotesHistoryProps) {
     return matchesSearch && matchesFilter;
   });
 
-  const filteredDetailQuotes = detailsQuotes.filter(quote => {
+  {/*const filteredDetailQuotes = detailsQuotes.filter(quote => {
     const term = searchTerm.trim().toLowerCase();
 
     // 1) Búsqueda por cliente o idCotizacion (igual que antes)
@@ -116,7 +116,7 @@ export function QuotesHistory({ onViewChange }: QuotesHistoryProps) {
       (quote.estado ?? "").toString().toLowerCase() === filterStatus.toLowerCase();
 
     return matchesSearch && matchesFilter;
-  });
+  });*/}
   const startIndex = (currentPage - 1) * itemsPerPage;
   const endIndex = Math.min(startIndex + itemsPerPage, filteredQuotes.length);
   const pageItems = filteredQuotes.slice(startIndex, endIndex);
@@ -139,7 +139,8 @@ export function QuotesHistory({ onViewChange }: QuotesHistoryProps) {
     }
   };
 
-  const convertToSale = (quote: any) => {
+  {/*
+    const convertToSale = (quote: any) => {
     // Verificar que la cotización esté en estado válido
     if (quote.status === "Rechazada") {
       toast.error("No se puede convertir una cotización rechazada");
@@ -174,6 +175,7 @@ export function QuotesHistory({ onViewChange }: QuotesHistoryProps) {
     onViewChange('new-sale');
   };
   const [quoteType, setQuoteType] = useState<"materials" | "labor">("materials");
+  */}
 
   const { generate } = usePdfGenerator();
   // sustituye la función generatePDF existente por esta
@@ -463,12 +465,12 @@ export function QuotesHistory({ onViewChange }: QuotesHistoryProps) {
       advance: anticipo,
     };
 
-    const subtotalCalc = quoteType === "materials"
+    /*const subtotalCalc = quoteType === "materials"
       ? itemsForPdf.reduce((s, it) => s + (Number(it.subtotal) || 0), 0)
       : Number((quote as any).subtotal ?? (quote.total ?? 0));
-
+    */
     const taxAmount = Number((quote as any).tax ?? 0);
-    const totalCalc = Number(quote.total ?? subtotalCalc + taxAmount);
+    //const totalCalc = Number(quote.total ?? subtotalCalc + taxAmount);
     const date = quote.fecha
       ? new Date(quote.fecha).toLocaleDateString("es-MX", { day: "numeric", month: "long", year: "numeric" })
       : new Date().toLocaleDateString("es-MX", { day: "numeric", month: "long", year: "numeric" });
@@ -542,12 +544,12 @@ export function QuotesHistory({ onViewChange }: QuotesHistoryProps) {
   };
 
 
-  const deleteQuote = (quoteId: string) => {
+  /*const deleteQuote = (quoteId: string) => {
     const updatedQuotes = quotes.filter(q => q.idCotizacion.toString() !== quoteId);
     setQuotes(updatedQuotes);
     localStorage.setItem('quotes', JSON.stringify(updatedQuotes));
     toast.success("Cotización eliminada");
-  };
+  };*/
 
   const viewQuoteDetail = async (quote: Quote) => {
     try {

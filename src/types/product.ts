@@ -1,16 +1,16 @@
 export interface Product {
   idProducto: number;
   nombre: string;
-  categoria: "Impermeabilizante" | "Productos para Concreto" | "Pinturas" | "Selladores" | "Recubrimientos";
+  categoria: "Impermeabilizantes" | "Productos para Concreto" | "Pinturas" | "Selladores" | "Recubrimientos";
   tipo: string | null;
-  unidad: string | null;
+  unidad: number | null;
   unidadMedida: string | null;
   color: string | null;
-  precioUnitario: number | null;
-  stock: number | null;
-  stockMinimo?: number | null;
+  precioUnitario: number;
+  stock: number;
+  stockMinimo: number;
   descripcion?: string | null;
   URLImagen?: string | null;
 }
 
-export type ProductPayload = Omit<Product, "idProducto">;
+export type ProductPayload = Product

@@ -1,37 +1,116 @@
-import { useState, useRef, useEffect } from "react";
-import { Plus, Package, TrendingDown, Eye, Edit, History } from "lucide-react";
+// src/pages/products/InventoryDashboard.tsx
+import { useCallback, useState, useRef, useEffect } from "react";
+import { Plus, Package, TrendingDown, Eye, Edit, History, Pencil, MapPin } from "lucide-react";
 import { Button } from "../../components/ui/button";
 import { Input } from "../../components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "../../components/ui/table";
 import { Badge } from "../../components/ui/badge";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../../components/ui/card";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "../../components/ui/dialog";
+import { Card, CardContent, CardHeader, CardTitle } from "../../components/ui/card";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "../../components/ui/dialog";
 import { ScrollArea } from "../../components/ui/scroll-area";
 import PaginationControls from "../../components/common/paginationControls";
 import { ImageWithFallback } from "../../components/figma/ImageWithFallback";
 import axios from "axios";
 import { toast } from "sonner";
-interface Product {
-  idProducto: number;
-  nombre: string;
-  precioUnitario: number;
-  stock: number;
-  stockMinimo: number;
-  unidad:number;
-  unidadMedida: string;
-  color: string;
-  categoria: string;
-  descripcion: string;
-  tipo: string;
-  URLImagen: string;
-  
-}
+
+import ProductForm from "./ProductForm";
+import type { Product, ProductPayload } from "../../types/product";
 
 interface InventoryDashboardProps {
   onViewChange: (view: string) => void;
 }
 
+/* ---------------------- Hook useProducts ----------------------
+   Maneja fetch / create / update / delete y mantiene estado local.
+------------------------------------------------------------ */
+function useProducts(apiBase = "/api/producto") {
+  const [products, setProducts] = useState<Product[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<any>(null);
+
+  const fetchAll = useCallback(async () => {
+    setLoading(true);
+    try {
+      const res = await axios.get(apiBase);
+      setProducts(res.data ?? []);
+      setError(null);
+    } catch (err) {
+      setError(err);
+      console.error("Error fetching products:", err);
+    } finally {
+      setLoading(false);
+    }
+  }, [apiBase]);
+
+  useEffect(() => {
+    fetchAll();
+  }, [fetchAll]);
+
+  const create = useCallback(
+    async (payload: ProductPayload) => {
+      const res = await axios.post(apiBase, payload);
+      await fetchAll();
+      return res.data;
+    },
+    [apiBase, fetchAll],
+  );
+
+  const update = useCallback(
+    async (id: number, payload: Partial<ProductPayload>) => {
+      // tu ruta es PUT /producto/editar/:id
+      const res = await axios.put(`${apiBase}/editar/${id}`, payload);
+      await fetchAll();
+      return res.data;
+    },
+    [apiBase, fetchAll],
+  );
+
+  const remove = useCallback(
+    async (id: number) => {
+      const res = await axios.delete(`${apiBase}/${id}`);
+      await fetchAll();
+      return res.data;
+    },
+    [apiBase, fetchAll],
+  );
+
+  return { products, setProducts, loading, error, fetchAll, create, update, remove };
+}
+
+/* ---------------------- Modal component ---------------------- */
+function Modal({
+  open,
+  onOpenChange,
+  title,
+  children,
+  footer,
+  size = "max-w-2xl",
+}: {
+  open: boolean;
+  onOpenChange: (v: boolean) => void;
+  title?: React.ReactNode;
+  children?: React.ReactNode;
+  footer?: React.ReactNode;
+  size?: string;
+}) {
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className={size}>
+        <DialogHeader>
+          {title && <DialogTitle className="text-slate-800">{title}</DialogTitle>}
+          <DialogDescription />
+        </DialogHeader>
+        <div className="py-4">{children}</div>
+        <DialogFooter>{footer}</DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+/* ---------------------- InventoryDashboard ---------------------- */
 export function InventoryDashboard({ onViewChange }: InventoryDashboardProps) {
+  const apiBase = "/api/producto";
+  const { products, setProducts, loading, fetchAll, update } = useProducts(apiBase);
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
   const [isViewModalOpen, setIsViewModalOpen] = useState(false);
@@ -39,38 +118,32 @@ export function InventoryDashboard({ onViewChange }: InventoryDashboardProps) {
   const [itemsPerPage] = useState(4);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // Datos mock del inventario
-  const [products, setProducts] = useState<Product[]>([]);
+  // MODALES
+  const [viewDetailsOpen, setViewDetailsOpen] = useState(false);
+  const [editDetailsOpen, setEditDetailsOpen] = useState(false);
+  const [editProduct, setEditProduct] = useState<Product | null>(null);
 
-  useEffect(() => {
-    axios.get("http://localhost:5000/api/producto")
-      .then((res) => {
-        setProducts(res.data);
-      })
-      .catch((err) => {
-        console.error("Error al obtener productos:", err);
-      });
-  }, []);
+  // Filtrado
+  const filteredProducts = products.filter((product) => {
+    const q = searchTerm.trim().toLowerCase();
+    if (!q) return true;
+    return (
+      String(product.idProducto).toLowerCase().includes(q) ||
+      (product.nombre ?? "").toLowerCase().includes(q) ||
+      (product.categoria ?? "").toLowerCase().includes(q)
+    );
+  });
 
-  const filteredProducts = products.filter(product =>
-    product.nombre.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    product.categoria.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    product.idProducto.toString().toLowerCase().includes(searchTerm.toLowerCase())
-  );
-
-  // Cálculos para paginación
-  const totalPages = Math.ceil(filteredProducts.length / itemsPerPage);
   const startIndex = (currentPage - 1) * itemsPerPage;
   const endIndex = startIndex + itemsPerPage;
   const currentProducts = filteredProducts.slice(startIndex, endIndex);
 
-  // Reset página actual cuando cambie el término de búsqueda
   const handleSearchChange = (value: string) => {
     setSearchTerm(value);
     setCurrentPage(1);
   };
 
-  const lowStockProducts = products.filter(product => product.stock <= product.stockMinimo);
+  const lowStockProducts = products.filter((product) => product.stock <= product.stockMinimo);
   const totalProducts = products.length;
   const totalValue = products.reduce((sum, product) => sum + (product.stock * product.precioUnitario), 0);
 
@@ -86,48 +159,74 @@ export function InventoryDashboard({ onViewChange }: InventoryDashboardProps) {
     setIsViewModalOpen(true);
   };
 
+  const handleOpenEdit = (c: Product) => {
+    setEditProduct(c);
+    setEditDetailsOpen(true);
+  };
+
   const handleEditImage = () => {
     fileInputRef.current?.click();
+  };
+
+  const handleSaveEdit = async (payload?: ProductPayload) => {
+    if (!editProduct) return;
+    try {
+      const body = payload ?? {
+        nombre: editProduct.nombre,
+        categoria: editProduct.categoria,
+        tipo: editProduct.tipo,
+        unidad: editProduct.unidad,
+        unidadMedida: editProduct.unidadMedida,
+        color: editProduct.color,
+        precioUnitario: editProduct.precioUnitario,
+        stock: editProduct.stock,
+        stockMinimo: editProduct.stockMinimo,
+        descripcion: editProduct.descripcion,
+      };
+      await update(editProduct.idProducto, body);
+      toast.success("Producto actualizado correctamente");
+      setEditDetailsOpen(false);
+      setEditProduct(null);
+    } catch (err) {
+      console.error("Error al actualizar:", err);
+      toast.error("No se pudo actualizar el producto");
+    }
   };
 
   const handleImageChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (file && selectedProduct) {
       const formData = new FormData();
-      
       formData.append("idProducto", selectedProduct.idProducto.toString());
       formData.append("image", file);
+
       try {
-      const response = await fetch("http://localhost:5000/api/producto/upload", {
-        method: "POST",
-        body: formData,
-      });
-
-      const data = await response.json();
-
-      if (data.success) {
-        const newUrl = `${data.URLImagen}?t=${Date.now()}`;
-        toast.error("Imagen actualizada");
-        setSelectedProduct({
-          ...selectedProduct,
-          URLImagen: newUrl,
+        const response = await axios.post(`${apiBase}/upload`, formData, {
+          headers: { "Content-Type": "multipart/form-data" },
         });
 
-        setProducts((prev) =>
-          prev.map((p) =>
-            p.idProducto === selectedProduct.idProducto
-              ? { ...p, URLImagen: newUrl }
-              : p
-          )
-        );
-      } else {
-        toast.error("❌ Error al subir imagen");
-        console.error("❌ Error al subir imagen:", data.error);
+        const data = response.data;
+
+        if (data.success) {
+          const newUrl = `${data.URLImagen}?t=${Date.now()}`;
+          toast.success("Imagen actualizada");
+          setSelectedProduct((prev) => (prev ? { ...prev, URLImagen: newUrl } : prev));
+
+          // actualizar lista en memoria
+          setProducts((prev) =>
+            prev.map((p) => (p.idProducto === selectedProduct.idProducto ? { ...p, URLImagen: newUrl } : p))
+          );
+        } else {
+          toast.error("❌ Error al subir imagen");
+          console.error("❌ Error al subir imagen:", data);
+        }
+      } catch (err) {
+        toast.error("❌ Error en la petición");
+        console.error("❌ Error en la petición:", err);
+      } finally {
+        // limpiar input para permitir volver a subir la misma imagen si se desea
+        if (fileInputRef.current) fileInputRef.current.value = "";
       }
-    } catch (err) {
-      toast.error("❌ Error en la petición");
-      console.error("❌ Error en la petición:", err);
-    }
     }
   };
 
@@ -135,7 +234,6 @@ export function InventoryDashboard({ onViewChange }: InventoryDashboardProps) {
     <div className="flex-1 p-6">
       <div className="mb-2">
         <h2 className="text-slate-800 text-2xl font-semibold mb-2">Inventario</h2>
-
       </div>
 
       {/* Tarjetas de resumen */}
@@ -177,30 +275,30 @@ export function InventoryDashboard({ onViewChange }: InventoryDashboardProps) {
       {/* Botones de acción y búsqueda */}
       <div className="flex flex-col md:flex-row gap-4 mb-2">
         <div className="flex gap-2">
-          <Button 
-            onClick={() => onViewChange('add-product')} 
+          <Button
+            onClick={() => onViewChange("add-product")}
             className="bg-blue-600 hover:bg-blue-700 text-white rounded-lg"
           >
             <Plus className="h-4 w-4 mr-2" />
             Agregar Producto
           </Button>
-          <Button 
-            variant="outline" 
-            onClick={() => onViewChange('entries')}
+          <Button
+            variant="outline"
+            onClick={() => onViewChange("entries")}
             className="border-slate-300 text-slate-700 hover:bg-slate-50 rounded-lg"
           >
             Registrar Entrada
           </Button>
-          <Button 
-            variant="outline" 
-            onClick={() => onViewChange('exits')}
+          <Button
+            variant="outline"
+            onClick={() => onViewChange("exits")}
             className="border-slate-300 text-slate-700 hover:bg-slate-50 rounded-lg"
           >
             Registrar Salida
           </Button>
-          <Button 
-            variant="outline" 
-            onClick={() => onViewChange('history')}
+          <Button
+            variant="outline"
+            onClick={() => onViewChange("history")}
             className="border-slate-300 text-slate-700 hover:bg-slate-50 rounded-lg"
           >
             <History className="h-4 w-4 mr-2" />
@@ -246,17 +344,23 @@ export function InventoryDashboard({ onViewChange }: InventoryDashboardProps) {
                       {product.stock}
                     </TableCell>
                     <TableCell className="text-slate-600">{product.stockMinimo}</TableCell>
-                    
-                    
                     <TableCell>{getStockStatus(product.stock, product.stockMinimo)}</TableCell>
                     <TableCell>
                       <Button
-                        variant="ghost"
+                        variant="outline"
                         size="sm"
                         onClick={() => handleViewProduct(product)}
                         className="h-8 w-8 p-0 text-slate-600 hover:text-blue-600 hover:bg-blue-50"
                       >
                         <Eye className="h-4 w-4" />
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => handleOpenEdit(product)}
+                        className="h-8 w-8 p-0 text-slate-600 hover:text-blue-600 hover:bg-blue-50"
+                      >
+                        <Pencil className="h-4 w-4" />
                       </Button>
                     </TableCell>
                   </TableRow>
@@ -264,7 +368,7 @@ export function InventoryDashboard({ onViewChange }: InventoryDashboardProps) {
               </TableBody>
             </Table>
           </ScrollArea>
-          
+
           {/* Información de paginación y controles */}
           {filteredProducts.length > 0 && (
             <PaginationControls
@@ -272,12 +376,39 @@ export function InventoryDashboard({ onViewChange }: InventoryDashboardProps) {
               currentPage={currentPage}
               itemsPerPage={itemsPerPage}
               onPageChange={(p) => setCurrentPage(p)}
-              maxButtons={4} 
+              maxButtons={4}
               labelPrefix="Mostrando"
             />
           )}
         </CardContent>
       </Card>
+
+      {/* Edit Modal */}
+      <Modal
+        open={editDetailsOpen}
+        onOpenChange={(v) => {
+          if (!v) {
+            setEditDetailsOpen(false);
+            setEditProduct(null);
+          }
+        }}
+        title="Editar Producto"
+        size="max-w-2xl"
+      >
+        {editProduct && (
+          <ProductForm
+            initial={editProduct as Partial<ProductPayload>}
+            onCancel={() => {
+              setEditDetailsOpen(false);
+              setEditProduct(null);
+            }}
+            onSubmit={async (payload) => {
+              await handleSaveEdit(payload);
+            }}
+            submitLabel="Guardar Cambios"
+          />
+        )}
+      </Modal>
 
       {/* Modal de visualización de producto */}
       <Dialog open={isViewModalOpen} onOpenChange={setIsViewModalOpen}>
@@ -286,10 +417,10 @@ export function InventoryDashboard({ onViewChange }: InventoryDashboardProps) {
             <DialogTitle className="text-slate-800 text-xl">{selectedProduct?.nombre}</DialogTitle>
             <Badge variant="secondary" className="text-slate-600">{selectedProduct?.categoria}</Badge>
             <p className="text-slate-600 leading-relaxed">
-                    {selectedProduct?.descripcion}
-                  </p>
+              {selectedProduct?.descripcion}
+            </p>
           </DialogHeader>
-          
+
           {selectedProduct && (
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-4">
               {/* Imagen del producto */}
@@ -318,7 +449,7 @@ export function InventoryDashboard({ onViewChange }: InventoryDashboardProps) {
                     className=""
                   />
                 </div>
-                
+
                 {/* Información básica visual */}
                 <div className="grid grid-cols-2 gap-4">
                   <Card className="border-slate-200">
@@ -338,13 +469,7 @@ export function InventoryDashboard({ onViewChange }: InventoryDashboardProps) {
 
               {/* Detalles del producto */}
               <div>
-                <div>
-                  {/*
-                  <h3 className="text-lg font-semibold text-slate-800 mb-2">{selectedProduct.nombre}</h3>
-                  <Badge variant="secondary" className="mb-4">{selectedProduct.categoria}</Badge>
-                  */}
-                  
-                </div>
+                <div />
 
                 {/* Especificaciones técnicas */}
                 <div className="space-y-4">
@@ -362,7 +487,6 @@ export function InventoryDashboard({ onViewChange }: InventoryDashboardProps) {
                       <span className="text-slate-600">Color:</span>
                       <span className="font-medium text-slate-800">{selectedProduct.color}</span>
                     </div>
-
                   </div>
                 </div>
 
@@ -374,14 +498,6 @@ export function InventoryDashboard({ onViewChange }: InventoryDashboardProps) {
                       <span className="text-slate-600">Stock mínimo:</span>
                       <span className="font-medium text-slate-800">{selectedProduct.stockMinimo} unidades</span>
                     </div>
-                    {/*
-                    <div className="flex justify-between items-center py-2 border-b border-slate-100">
-                      <span className="text-slate-600">Valor total en stock:</span>
-                      <span className="font-medium text-green-600">
-                        ${(selectedProduct.stock * selectedProduct.precioUnitario).toFixed(2)}
-                      </span>
-                    </div>
-                    */}
                     <div className="flex justify-between items-center py-2">
                       <span className="text-slate-600">Estado:</span>
                       {getStockStatus(selectedProduct.stock, selectedProduct.stockMinimo)}
@@ -391,26 +507,25 @@ export function InventoryDashboard({ onViewChange }: InventoryDashboardProps) {
 
                 {/* Botones de acción */}
                 <div className="flex gap-3 pt-4 border-t border-slate-100">
-                  <Button 
+                  <Button
                     onClick={() => {
                       setIsViewModalOpen(false);
-                      onViewChange('entries');
+                      onViewChange("entries");
                     }}
                     className="bg-green-600 hover:bg-green-700 text-white"
                   >
                     Registrar Entrada
                   </Button>
-                  <Button 
+                  <Button
                     onClick={() => {
                       setIsViewModalOpen(false);
-                      onViewChange('exits');
+                      onViewChange("exits");
                     }}
                     variant="outline"
                     className="border-red-300 text-red-700 hover:bg-red-50"
                   >
                     Registrar Salida
                   </Button>
-                  
                 </div>
               </div>
             </div>
@@ -420,3 +535,5 @@ export function InventoryDashboard({ onViewChange }: InventoryDashboardProps) {
     </div>
   );
 }
+
+export default InventoryDashboard;

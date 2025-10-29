@@ -1,12 +1,12 @@
 import { useState, useEffect } from "react";
-import { ArrowLeft, Plus, Trash2, Save, Calculator, FileText, Search, UserPlus, X, Download, ShoppingCart, Package } from "lucide-react";
+import { ArrowLeft, Plus, Trash2, Save, Calculator, FileText, Search, UserPlus, Package } from "lucide-react";
 import { Button } from "../../components/ui/button";
 import { Input } from "../../components/ui/input";
 import { Label } from "../../components/ui/label";
 import { Textarea } from "../../components/ui/textarea";
 import { Checkbox } from "../../components/ui/checkbox";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../../components/ui/select";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../../components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "../../components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "../../components/ui/table";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "../../components/ui/dialog";
 import { toast } from "sonner";
@@ -181,12 +181,12 @@ export function NewQuote({ onViewChange }: NewQuoteProps) {
     product.nombre.toLowerCase().includes(productSearchTerm.toLowerCase())
   );
 
-  const handleInputChange = (field: string, value: string | number) => {
+  /*const handleInputChange = (field: string, value: string | number) => {
     setFormData(prev => ({
       ...prev,
       [field]: value
     }));
-  };
+  };*/
 
   const handleNewClientInputChange = (field: string, value: string) => {
     setNewClientData(prev => ({
@@ -413,7 +413,7 @@ export function NewQuote({ onViewChange }: NewQuoteProps) {
 
   // descuentos/impuestos SOLO para materials
 
-  const itemsToSave = prepareItemsForExport();
+  /*const itemsToSave = prepareItemsForExport();*/
 
   const taxAmount = quoteType === "materials"
     ? subtotalMaterials * (((Number(formData.tax) || 0)) / 100)
@@ -467,7 +467,7 @@ export function NewQuote({ onViewChange }: NewQuoteProps) {
 
 
 
-  const convertToSale = () => {
+  /*const convertToSale = () => {
     if (!formData.clientId || items.length === 0) {
       toast.error("Completa la cotización antes de convertir a venta");
       return;
@@ -512,7 +512,7 @@ export function NewQuote({ onViewChange }: NewQuoteProps) {
 
     toast.success("Cotización convertida a venta");
     onViewChange('new-sale');
-  };
+  };*/
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();

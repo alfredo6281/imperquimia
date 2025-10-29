@@ -13,28 +13,8 @@ import { Label } from "../../components/ui/label";
 import axios from "axios";
 import { toast } from "sonner";
 import PaginationControls from "../../components/common/paginationControls";
-
-/* ---------------------- Types ---------------------- */
-type Customer = {
-  idCliente: number;
-  nombre: string;
-  contacto: string | null;
-  domicilio?: string | null;
-  telefono?: string | null;
-  correo?: string | null;
-  tipo?: "Personal" | "Empresa" | string;
-  lastPurchase?: string | null;
-  totalPurchases?: number;
-};
-
-type ClientPayload = {
-  nombre: string;
-  contacto: string | null;
-  domicilio?: string;
-  telefono?: string;
-  correo?: string;
-  tipo: string;
-};
+import CustomerForm from "../customers/CustomerForm";
+import type { Customer, CustomerPayload } from "../../types/customer";
 
 /* ---------------------- Hook useClients ----------------------
    Maneja fetch / create / update / delete y mantiene estado local.
@@ -64,7 +44,7 @@ function useClients(apiBase = "/api/cliente") {
   }, [fetchAll]);
 
   const create = useCallback(
-    async (payload: ClientPayload) => {
+    async (payload: CustomerPayload) => {
       const res = await axios.post(apiBase, payload);
       // Refetch para consistencia con backend
       await fetchAll();
@@ -74,7 +54,7 @@ function useClients(apiBase = "/api/cliente") {
   );
 
   const update = useCallback(
-    async (id: number, payload: Partial<ClientPayload>) => {
+    async (id: number, payload: Partial<CustomerPayload>) => {
       const res = await axios.put(`${apiBase}/${id}`, payload);
       await fetchAll();
       return res.data;
@@ -172,106 +152,7 @@ function ConfirmDialog({
   );
 }
 
-/* ---------------------- CustomerForm (reusable) ---------------------- */
-function CustomerForm({
-  initial,
-  onSubmit,
-  onCancel,
-  submitLabel = "Guardar",
-}: {
-  initial?: Partial<Customer>;
-  onSubmit: (payload: ClientPayload) => Promise<void> | void;
-  onCancel?: () => void;
-  submitLabel?: string;
-}) {
-  const [nombre, setNombre] = useState(initial?.nombre ?? "");
-  const [tipo, setTipo] = useState<string>(initial?.tipo ?? "Personal");
-  const [contacto, setContacto] = useState(initial?.contacto ?? "");
-  const [telefono, setTelefono] = useState(initial?.telefono ?? "");
-  const [correo, setCorreo] = useState(initial?.correo ?? "");
-  const [domicilio, setDomicilio] = useState(initial?.domicilio ?? "");
 
-  useEffect(() => {
-    // sincronizar si cambian initial (útil en editar)
-    setNombre(initial?.nombre ?? "");
-    setTipo(initial?.tipo ?? "Personal");
-    setContacto(initial?.contacto ?? "");
-    setTelefono(initial?.telefono ?? "");
-    setCorreo(initial?.correo ?? "");
-    setDomicilio(initial?.domicilio ?? "");
-  }, [initial]);
-
-  const handleSubmit = async (e?: React.FormEvent) => {
-    e?.preventDefault();
-    const payload: ClientPayload = {
-      nombre: nombre.trim(),
-      contacto: tipo === "Personal" ? null : (contacto ? contacto.trim() : null),
-      telefono: telefono ? telefono.trim() : undefined,
-      correo: correo ? correo.trim() : undefined,
-      domicilio: domicilio ? domicilio.trim() : undefined,
-      tipo,
-    };
-    await onSubmit(payload);
-  };
-
-  return (
-    <form onSubmit={handleSubmit} className="grid grid-cols-2 gap-4">
-      <div className="col-span-2 space-y-2">
-        <Label>Nombre / Razón Social *</Label>
-        <Input value={nombre} onChange={(e) => setNombre(e.target.value)} />
-      </div>
-
-      <div className="space-y-2">
-        <Label>Tipo</Label>
-        <Select value={tipo} onValueChange={(v) => setTipo(v)}>
-          <SelectTrigger className="rounded-lg border-slate-300">
-            <SelectValue placeholder="Selecciona tipo" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="Personal">Personal</SelectItem>
-            <SelectItem value="Empresa">Empresa</SelectItem>
-          </SelectContent>
-        </Select>
-      </div>
-
-      <div className="space-y-2">
-        <Label>Persona de Contacto</Label>
-        <Input
-          value={contacto ?? ""}
-          onChange={(e) => setContacto(e.target.value)}
-          disabled={tipo === "Personal"}
-        />
-        <p className="text-xs text-slate-500">Si es Personal, se guarda contacto como null.</p>
-      </div>
-
-      <div className="space-y-2">
-        <Label>Teléfono *</Label>
-        <Input value={telefono} onChange={(e) => setTelefono(e.target.value)} />
-      </div>
-
-      <div className="space-y-2">
-        <Label>Correo</Label>
-        <Input value={correo} onChange={(e) => setCorreo(e.target.value)} />
-      </div>
-
-      <div className="col-span-2 space-y-2">
-        <Label>Dirección</Label>
-        <Input value={domicilio} onChange={(e) => setDomicilio(e.target.value)} />
-      </div>
-
-      <div className="col-span-2 flex justify-end gap-2">
-        {onCancel && (
-          <Button variant="outline" onClick={onCancel}>
-            Cancelar
-          </Button>
-        )}
-        <Button type="submit" className="bg-emerald-600 hover:bg-emerald-700 text-white">
-          {submitLabel}
-        </Button>
-      </div>
-    </form>
-  );
-}
 
 /* ---------------------- CustomersManagement component ---------------------- */
 export function CustomersManagement({ onViewChange }: { onViewChange?: (v: string) => void }) {
@@ -302,10 +183,10 @@ export function CustomersManagement({ onViewChange }: { onViewChange?: (v: strin
   const clientsList: Customer[] = Array.isArray(clients)
     ? clients
     : Array.isArray((clients as any)?.data)
-    ? (clients as any).data
-    : Array.isArray((clients as any)?.recordset)
-    ? (clients as any).recordset
-    : [];
+      ? (clients as any).data
+      : Array.isArray((clients as any)?.recordset)
+        ? (clients as any).recordset
+        : [];
 
   const filtered = clientsList.filter((c) => {
     const nombre = String(c.nombre ?? "").toLowerCase();
@@ -330,16 +211,17 @@ export function CustomersManagement({ onViewChange }: { onViewChange?: (v: strin
     setEditDetailsOpen(true);
   };
 
-  const handleSaveEdit = async (payload?: ClientPayload) => {
+  const handleSaveEdit = async (payload?: CustomerPayload) => {
     if (!editCustomer) return;
     try {
-      const body = payload ?? {
+      // Si no te dan payload, construimos uno desde editCustomer
+      const body: CustomerPayload = payload ?? {
         nombre: editCustomer.nombre,
-        contacto: editCustomer.tipo === "Personal" ? null : editCustomer.contacto,
-        telefono: editCustomer.telefono ?? undefined,
-        correo: editCustomer.correo ?? undefined,
-        domicilio: editCustomer.domicilio ?? undefined,
-        tipo: editCustomer.tipo ?? "Personal",
+        contacto: editCustomer.tipo === "Personal" ? null : (editCustomer.contacto ?? null),
+        telefono: editCustomer.telefono ?? null,
+        correo: editCustomer.correo ?? null,
+        domicilio: editCustomer.domicilio ?? null,
+        tipo: (editCustomer.tipo as "Personal" | "Empresa") ?? "Personal",
       };
       await update(editCustomer.idCliente, body);
       toast.success("Cliente actualizado correctamente");
@@ -350,6 +232,7 @@ export function CustomersManagement({ onViewChange }: { onViewChange?: (v: strin
       toast.error("No se pudo actualizar el cliente");
     }
   };
+
 
   const handleDeleteConfirm = async () => {
     if (!selected) return;
@@ -364,7 +247,7 @@ export function CustomersManagement({ onViewChange }: { onViewChange?: (v: strin
     }
   };
 
-  const handleCreate = async (payload: ClientPayload) => {
+  const handleCreate = async (payload: CustomerPayload) => {
     if (!payload.nombre?.trim()) {
       toast.error("El nombre es obligatorio");
       return;
@@ -373,7 +256,6 @@ export function CustomersManagement({ onViewChange }: { onViewChange?: (v: strin
       await create(payload);
       toast.success("Cliente creado exitosamente");
       setNewOpen(false);
-      // fetchAll already called inside create; update current page to last
       const newTotal = (await axios.get("/api/cliente")).data.length;
       setCurrentPage(Math.max(1, Math.ceil(newTotal / itemsPerPage)));
     } catch (err) {
@@ -381,6 +263,7 @@ export function CustomersManagement({ onViewChange }: { onViewChange?: (v: strin
       toast.error("Error al crear cliente");
     }
   };
+
 
   /* Render */
   return (
@@ -584,7 +467,7 @@ export function CustomersManagement({ onViewChange }: { onViewChange?: (v: strin
       >
         {editCustomer && (
           <CustomerForm
-            initial={editCustomer}
+            initial={editCustomer as Partial<CustomerPayload>}
             onCancel={() => {
               setEditDetailsOpen(false);
               setEditCustomer(null);
@@ -596,6 +479,8 @@ export function CustomersManagement({ onViewChange }: { onViewChange?: (v: strin
           />
         )}
       </Modal>
+
+
 
       {/* New Modal */}
       <Modal
@@ -612,6 +497,8 @@ export function CustomersManagement({ onViewChange }: { onViewChange?: (v: strin
           submitLabel="Crear Cliente"
         />
       </Modal>
+
+
 
       {/* Delete Confirm */}
       <ConfirmDialog

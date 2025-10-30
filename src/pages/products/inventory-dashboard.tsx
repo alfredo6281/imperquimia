@@ -12,6 +12,7 @@ import PaginationControls from "../../components/common/paginationControls";
 import { ImageWithFallback } from "../../components/figma/ImageWithFallback";
 import axios from "axios";
 import { toast } from "sonner";
+import  EditProduct from "./edit-product"; // ajusta ruta si hace falta
 
 import ProductForm from "./ProductForm";
 import type { Product, ProductPayload } from "../../types/product";
@@ -396,7 +397,7 @@ export function InventoryDashboard({ onViewChange }: InventoryDashboardProps) {
         size="max-w-2xl"
       >
         {editProduct && (
-          <ProductForm
+          <EditProduct
             initial={editProduct as Partial<ProductPayload>}
             onCancel={() => {
               setEditDetailsOpen(false);

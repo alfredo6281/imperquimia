@@ -6,6 +6,7 @@ import { Label } from "../../components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../../components/ui/select";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../../components/ui/card";
 import { toast } from "sonner";
+import { Textarea } from "../../components/ui/textarea";
 
 interface AddProductProps {
   onViewChange: (view: string) => void;
@@ -13,12 +14,12 @@ interface AddProductProps {
 
 export function AddProduct({ onViewChange }: AddProductProps) {
   const [formData, setFormData] = useState({
-    idProducto:"",
+    idProducto: "",
     nombre: "",
     categoria: "",
-    unidad:"",
+    unidad: "",
     unidadMedida: "",
-    tipo:"",
+    tipo: "",
     stock: "",
     stockMinimo: "",
     precioUnitario: "",
@@ -55,7 +56,7 @@ export function AddProduct({ onViewChange }: AddProductProps) {
     "Transparente"
   ]
   const categorias = [
-    "Impermeabilizantes", 
+    "Impermeabilizantes",
     "Productos para Concreto",
     "Pinturas",
     "Selladores",
@@ -66,8 +67,8 @@ export function AddProduct({ onViewChange }: AddProductProps) {
     "Ninguno",
     "Litros",
     "Mililitros",
-    "Gramos", 
-    "Kilogramos", 
+    "Gramos",
+    "Kilogramos",
     "Metros²",
     "Pulgadas"
   ];
@@ -87,7 +88,7 @@ export function AddProduct({ onViewChange }: AddProductProps) {
         toast.error("Por favor selecciona un archivo de imagen válido");
         return;
       }
-      
+
       // Validar tamaño (máximo 5MB)
       if (file.size > 5 * 1024 * 1024) {
         toast.error("La imagen debe ser menor a 5MB");
@@ -95,7 +96,7 @@ export function AddProduct({ onViewChange }: AddProductProps) {
       }
 
       setSelectedImage(file);
-      
+
       // Crear preview
       const reader = new FileReader();
       reader.onload = (e) => {
@@ -113,99 +114,99 @@ export function AddProduct({ onViewChange }: AddProductProps) {
 
 
   const handleSubmit = async (e: React.FormEvent) => {
-  e.preventDefault();
+    e.preventDefault();
 
-  if (
-    !formData.idProducto ||
-    !formData.nombre ||
-    !formData.categoria ||
-    !formData.tipo ||
-    !formData.unidadMedida ||
-    !formData.stock ||
-    !formData.stockMinimo ||
-    !formData.precioUnitario ||
-    !formData.color
-  ) {
-    toast.error("Por favor, completa todos los campos");
-    return;
-  }
-
-  try {
-    // 1️⃣ Guardar producto en la BD
-    const response = await fetch("http://localhost:5000/api/producto", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        idProducto: parseInt(formData.idProducto, 10),
-        nombre: formData.nombre,
-        categoria: formData.categoria,
-        tipo: formData.tipo,
-        unidad: parseInt(formData.unidad || "0", 10),
-        unidadMedida: formData.unidadMedida,
-        color: formData.color,
-        precioUnitario: parseFloat(formData.precioUnitario),
-        stock: parseInt(formData.stock, 10),
-        stockMinimo: parseInt(formData.stockMinimo, 10),
-        descripcion: formData.descripcion,
-        URLImagen: formData.URLImagen, // Se actualizará después
-      }),
-    });
-    console.log("Respuesta del servidor:", response);
-    const text = await response.text();
-    console.log("Texto devuelto:", text);
-    if (!response.ok) throw new Error(`Error al guardar el producto: ${response.status}`);
-    if (!response.ok) throw new Error("Error al guardar el producto");
-
-    //const data = await response.json();
-    const idProducto = formData.idProducto;
-    
-    // 2️⃣ Subir imagen (si hay)
-    if (selectedImage) {
-      const formDataImage = new FormData();
-      formDataImage.append("image", selectedImage);
-      formDataImage.append("idProducto", String(idProducto));
-
-      const imgRes = await fetch("http://localhost:5000/api/producto/upload", {
-        method: "POST",
-        body: formDataImage,
-      });
-
-      if (!imgRes.ok) throw new Error("Error al subir imagen");
+    if (
+      !formData.idProducto ||
+      !formData.nombre ||
+      !formData.categoria ||
+      !formData.tipo ||
+      !formData.unidadMedida ||
+      !formData.stock ||
+      !formData.stockMinimo ||
+      !formData.precioUnitario ||
+      !formData.color
+    ) {
+      toast.error("Por favor, completa todos los campos");
+      return;
     }
 
-    toast.success("Producto agregado exitosamente");
+    try {
+      // 1️⃣ Guardar producto en la BD
+      const response = await fetch("http://localhost:5000/api/producto", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          idProducto: parseInt(formData.idProducto, 10),
+          nombre: formData.nombre,
+          categoria: formData.categoria,
+          tipo: formData.tipo,
+          unidad: parseInt(formData.unidad || "0", 10),
+          unidadMedida: formData.unidadMedida,
+          color: formData.color,
+          precioUnitario: parseFloat(formData.precioUnitario),
+          stock: parseInt(formData.stock, 10),
+          stockMinimo: parseInt(formData.stockMinimo, 10),
+          descripcion: formData.descripcion,
+          URLImagen: formData.URLImagen, // Se actualizará después
+        }),
+      });
+      console.log("Respuesta del servidor:", response);
+      const text = await response.text();
+      console.log("Texto devuelto:", text);
+      if (!response.ok) throw new Error(`Error al guardar el producto: ${response.status}`);
+      if (!response.ok) throw new Error("Error al guardar el producto");
 
-    // Limpiar formulario
-    setFormData({
-      idProducto: "",
-      nombre: "",
-      categoria: "",
-      unidad: "",
-      unidadMedida: "",
-      stock: "",
-      tipo: "",
-      stockMinimo: "",
-      precioUnitario: "",
-      color: "",
-      descripcion: "",
-      URLImagen: "",
-    });
-    setSelectedImage(null);
-    setImagePreview(null);
-    setTimeout(() => {
-      onViewChange("inventory");
-    }, 1000);
-  } catch (error) {
-    console.error("Error detallado:", error);
-    toast.error("Hubo un problema al guardar el producto: ");
-  }
-};
+      //const data = await response.json();
+      const idProducto = formData.idProducto;
+
+      // 2️⃣ Subir imagen (si hay)
+      if (selectedImage) {
+        const formDataImage = new FormData();
+        formDataImage.append("image", selectedImage);
+        formDataImage.append("idProducto", String(idProducto));
+
+        const imgRes = await fetch("http://localhost:5000/api/producto/upload", {
+          method: "POST",
+          body: formDataImage,
+        });
+
+        if (!imgRes.ok) throw new Error("Error al subir imagen");
+      }
+
+      toast.success("Producto agregado exitosamente");
+
+      // Limpiar formulario
+      setFormData({
+        idProducto: "",
+        nombre: "",
+        categoria: "",
+        unidad: "",
+        unidadMedida: "",
+        stock: "",
+        tipo: "",
+        stockMinimo: "",
+        precioUnitario: "",
+        color: "",
+        descripcion: "",
+        URLImagen: "",
+      });
+      setSelectedImage(null);
+      setImagePreview(null);
+      setTimeout(() => {
+        onViewChange("inventory");
+      }, 1000);
+    } catch (error) {
+      console.error("Error detallado:", error);
+      toast.error("Hubo un problema al guardar el producto: ");
+    }
+  };
 
   return (
     <div className="flex-1 p-6">
       <div className="mb-6 flex items-center gap-4 ">
-        <Button 
-          variant="outline" 
+        <Button
+          variant="outline"
           onClick={() => onViewChange('inventory')}
           className="border-slate-300 text-slate-700 hover:bg-slate-50 rounded-lg"
         >
@@ -227,211 +228,217 @@ export function AddProduct({ onViewChange }: AddProductProps) {
           </CardHeader>
           <CardContent>
             <form onSubmit={handleSubmit} className="space-y-6">
-              <div className="parent">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 formulario">
-                  <div className="space-y-2">
-                    <Label htmlFor="id" className="text-slate-700">Código</Label>
-                    <div className="relative">
-                      <Input
-                        id="id"
-                        value={formData.idProducto}
-                        onChange={(e) => handleInputChange('idProducto', e.target.value)}
-                        type="number"
-                        placeholder="10000000"
-                        className="rounded-lg border-slate-300 pr-16"
-                        maxLength={5}
-                        autoComplete="off"
-                      />
-                      <span className={`absolute right-3 top-1/2 transform -translate-y-1/2 text-xs pointer-events-none ${
-                        formData.idProducto.length > 7 
-                          ? 'text-red-500' 
-                          : formData.idProducto.length > 5 
-                            ? 'text-amber-500' 
-                            : 'text-slate-400'
+
+
+              <div className="grid grid-cols-3 md:grid-cols-3 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="id" className="text-slate-700">Código</Label>
+                  <div className="relative">
+                    <Input
+                      id="id"
+                      value={formData.idProducto}
+                      onChange={(e) => handleInputChange('idProducto', e.target.value)}
+                      type="number"
+                      placeholder="10000000"
+                      className="rounded-lg border-slate-300 pr-16"
+                      maxLength={5}
+                      autoComplete="off"
+                    />
+                    <span className={`absolute right-3 top-1/2 transform -translate-y-1/2 text-xs pointer-events-none ${formData.idProducto.length > 7
+                      ? 'text-red-500'
+                      : formData.idProducto.length > 5
+                        ? 'text-amber-500'
+                        : 'text-slate-400'
                       }`}>
-                        {formData.idProducto.length}/8
-                      </span>
-                    </div>
+                      {formData.idProducto.length}/8
+                    </span>
                   </div>
-                  
-                  <div className="space-y-2">
-                    <Label htmlFor="name" className="text-slate-700">Nombre del Producto</Label>
-                    <div className="relative">
-                      <Input
-                        id="name"
-                        value={formData.nombre}
-                        onChange={(e) => handleInputChange('nombre', e.target.value)}
-                        placeholder="Ej: Impermeabilizante Acrílico"
-                        className="rounded-lg border-slate-300 pr-16"
-                        maxLength={50}
-                        autoComplete="off"
-                      />
-                      <span className={`absolute right-3 top-1/2 transform -translate-y-1/2 text-xs pointer-events-none ${
-                        formData.nombre.length > 40 
-                          ? 'text-red-500' 
-                          : formData.nombre.length > 25 
-                            ? 'text-amber-500' 
-                            : 'text-slate-400'
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="name" className="text-slate-700">Nombre del Producto</Label>
+                  <div className="relative">
+                    <Input
+                      id="name"
+                      value={formData.nombre}
+                      onChange={(e) => handleInputChange('nombre', e.target.value)}
+                      placeholder="Ej: Impermeabilizante Acrílico"
+                      className="rounded-lg border-slate-300 pr-16"
+                      maxLength={50}
+                      autoComplete="off"
+                    />
+                    <span className={`absolute right-3 top-1/2 transform -translate-y-1/2 text-xs pointer-events-none ${formData.nombre.length > 40
+                      ? 'text-red-500'
+                      : formData.nombre.length > 25
+                        ? 'text-amber-500'
+                        : 'text-slate-400'
                       }`}>
-                        {formData.nombre.length}/50
-                      </span>
-                    </div>
+                      {formData.nombre.length}/50
+                    </span>
                   </div>
+                </div>
 
-                  <div className="space-y-2">
-                    <Label htmlFor="categoria" className="text-slate-700">Categoría</Label>
-                    <Select value={formData.categoria} onValueChange={(value) => handleInputChange('categoria', value)}>
-                      <SelectTrigger className="rounded-lg border-slate-300">
-                        <SelectValue placeholder="Selecciona categoría" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {categorias.map((categoria) => (
-                          <SelectItem key={categoria} value={categoria}>
-                            {categoria}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
+                <div className="space-y-2">
+                  <Label htmlFor="categoria" className="text-slate-700">Categoría</Label>
+                  <Select value={formData.categoria} onValueChange={(value) => handleInputChange('categoria', value)}>
+                    <SelectTrigger className="rounded-lg border-slate-300">
+                      <SelectValue placeholder="Selecciona categoría" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {categorias.map((categoria) => (
+                        <SelectItem key={categoria} value={categoria}>
+                          {categoria}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+              <div className="grid grid-cols-3 md:grid-cols-3 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="unitMeasure" className="text-slate-700">Tipo</Label>
+                  <Select value={formData.tipo} onValueChange={(value) => handleInputChange('tipo', value)}>
+                    <SelectTrigger className="rounded-lg border-slate-300">
+                      <SelectValue placeholder="Selecciona tipo" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {tipo.map((unit) => (
+                        <SelectItem key={unit} value={unit}>
+                          {unit}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
 
-                  <div className="space-y-2">
-                    <Label htmlFor="unitMeasure" className="text-slate-700">Tipo</Label>
-                    <Select value={formData.tipo} onValueChange={(value) => handleInputChange('tipo', value)}>
-                      <SelectTrigger className="rounded-lg border-slate-300">
-                        <SelectValue placeholder="Selecciona tipo" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {tipo.map((unit) => (
-                          <SelectItem key={unit} value={unit}>
-                            {unit}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label htmlFor="initialStock" className="text-slate-700">Stock Inicial</Label>
-                    <Input
-                      id="initialStock"
-                      type="number"
-                      value={formData.stock}
-                      onChange={(e) => handleInputChange('stock', e.target.value)}
-                      placeholder="Ej: 50"
-                      min="0"
-                      className="rounded-lg border-slate-300"
-                      autoComplete="off"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="stockMinimo" className="text-slate-700">Stock Minimo</Label>
-                    <Input
-                      id="stockMinimo"
-                      type="number"
-                      value={formData.stockMinimo}
-                      onChange={(e) => handleInputChange('stockMinimo', e.target.value)}
-                      placeholder="Ej: 50"
-                      min="0"
-                      className="rounded-lg border-slate-300"
-                      autoComplete="off"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="name" className="text-slate-700">Unidad (Opcional)</Label>
-                    <div className="relative">
-                      <Input
-                        id="unidad"
-                        value={formData.unidad}
-                        onChange={(e) => handleInputChange('unidad', e.target.value)}
-                        type="number"
-                        className="rounded-lg border-slate-300 pr-16"
-                        autoComplete="off"
-                      />
-                    </div>
-                  </div>      
-                  <div className="space-y-2">
-                    <Label htmlFor="unitMeasure" className="text-slate-700">Unidad de Medida</Label>
-                    <Select value={formData.unidadMedida} onValueChange={(value) => handleInputChange('unidadMedida', value)}>
-                      <SelectTrigger className="rounded-lg border-slate-300">
-                        <SelectValue placeholder="Selecciona unidad" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {unidadesMedida.map((unit) => (
-                          <SelectItem key={unit} value={unit}>
-                            {unit}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="unitPrice" className="text-slate-700">Precio Unitario</Label>
-                    <Input
-                      id="unitPrice"
-                      type="number"
-                      step="0.01"
-                      value={formData.precioUnitario}
-                      onChange={(e) => handleInputChange('precioUnitario', e.target.value)}
-                      placeholder="Ej: 45.99"
-                      min="0"
-                      className="rounded-lg border-slate-300"
-                      autoComplete="off"
-                    />
-                  </div>
-                  
-                      
-                  <div className="space-y-2">
-                    <Label htmlFor="colores" className="text-slate-700">Color</Label>
-                    <Select value={formData.color} onValueChange={(value) => handleInputChange('color', value)}>
-                      <SelectTrigger className="rounded-lg border-slate-300">
-                        <SelectValue placeholder="Selecciona color" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {colores.map((color) => (
-                          <SelectItem key={color} value={color}>
-                            {color}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  
+                <div className="space-y-2">
+                  <Label htmlFor="initialStock" className="text-slate-700">Stock Inicial</Label>
+                  <Input
+                    id="initialStock"
+                    type="number"
+                    value={formData.stock}
+                    onChange={(e) => handleInputChange('stock', e.target.value)}
+                    placeholder="Ej: 50"
+                    min="0"
+                    className="rounded-lg border-slate-300"
+                    autoComplete="off"
+                  />
                 </div>
                 <div className="space-y-2">
-                    <Label htmlFor="descripcion" className="text-slate-700">Descripción (Opcional)</Label>
-                    <div className="relative">
-                      <Input
-                        id="descripcion"
-                        value={formData.descripcion}
-                        onChange={(e) => handleInputChange('descripcion', e.target.value)}
-                        placeholder="Ej: Impermeabilizante Acrílico"
-                        className="rounded-lg border-slate-300 pr-16"
-                        maxLength={100}
-                        autoComplete="off"
-                      />
-                      <span className={`absolute right-3 top-1/2 transform -translate-y-1/2 text-xs pointer-events-none ${
-                        formData.descripcion.length > 90 
-                          ? 'text-red-500' 
-                          : formData.descripcion.length > 50 
-                            ? 'text-amber-500' 
-                            : 'text-slate-400'
-                      }`}>
-                        {formData.descripcion.length}/100
-                      </span>
-                    </div>
-                  </div>
-                
+                  <Label htmlFor="stockMinimo" className="text-slate-700">Stock Minimo</Label>
+                  <Input
+                    id="stockMinimo"
+                    type="number"
+                    value={formData.stockMinimo}
+                    onChange={(e) => handleInputChange('stockMinimo', e.target.value)}
+                    placeholder="Ej: 50"
+                    min="0"
+                    className="rounded-lg border-slate-300"
+                    autoComplete="off"
+                  />
+                </div>
               </div>
-                    
+              <div className="grid grid-cols-4 md:grid-cols-4 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="name" className="text-slate-700">Unidad (Opcional)</Label>
+                  <div className="relative">
+                    <Input
+                      id="unidad"
+                      value={formData.unidad}
+                      onChange={(e) => handleInputChange('unidad', e.target.value)}
+                      type="number"
+                      className="rounded-lg border-slate-300 pr-16"
+                      autoComplete="off"
+                    />
+                  </div>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="unitMeasure" className="text-slate-700">Unidad de Medida</Label>
+                  <Select value={formData.unidadMedida} onValueChange={(value) => handleInputChange('unidadMedida', value)}>
+                    <SelectTrigger className="rounded-lg border-slate-300">
+                      <SelectValue placeholder="Selecciona unidad" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {unidadesMedida.map((unit) => (
+                        <SelectItem key={unit} value={unit}>
+                          {unit}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="unitPrice" className="text-slate-700">Precio Unitario</Label>
+                  <Input
+                    id="unitPrice"
+                    type="number"
+                    step="0.01"
+                    value={formData.precioUnitario}
+                    onChange={(e) => handleInputChange('precioUnitario', e.target.value)}
+                    placeholder="Ej: 45.99"
+                    min="0"
+                    className="rounded-lg border-slate-300"
+                    autoComplete="off"
+                  />
+                </div>
+
+
+                <div className="space-y-2">
+                  <Label htmlFor="colores" className="text-slate-700">Color</Label>
+                  <Select value={formData.color} onValueChange={(value) => handleInputChange('color', value)}>
+                    <SelectTrigger className="rounded-lg border-slate-300">
+                      <SelectValue placeholder="Selecciona color" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {colores.map((color) => (
+                        <SelectItem key={color} value={color}>
+                          {color}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+
+              {/* Campo de descripción que abarca dos columnas */}
+              <div className="space-y-2">
+                <Label htmlFor="descripcion" className="text-slate-700">Descripción (Opcional)</Label>
+                <div className="relative">
+                  <Textarea
+                    id="descripcion"
+                    value={formData.descripcion}
+                    onChange={(e) => handleInputChange('descripcion', e.target.value)}
+                    placeholder="Ej: Impermeabilizante Acrílico"
+                    className="w-full h-32 min-h-[120px] resize-y overflow-auto 
+                    whitespace-pre-wrap break-words rounded-lg border-slate-300 pr-10 p-3"
+                    maxLength={100}
+                    autoComplete="off"
+                  />
+                  <div className="flex justify-between items-center">
+                    <span className={`absolute right-3 top-1/2 transform -translate-y-1/2 text-xs pointer-events-none ${formData.descripcion.length > 90
+                      ? 'text-red-500'
+                      : formData.descripcion.length > 50
+                        ? 'text-amber-500'
+                        : 'text-slate-400'
+                      }`}>
+                      {formData.descripcion.length}/100
+                    </span>
+                  </div>
+
+                </div>
+              </div>
+
+
+
               <div className="flex gap-4 pt-4">
-                <Button 
+                <Button
                   type="submit"
                   className="bg-blue-600 hover:bg-blue-700 text-white rounded-lg"
                 >
                   <Save className="h-4 w-4 mr-2" />
                   Guardar Producto
                 </Button>
-                <Button 
+                <Button
                   type="button"
                   variant="outline"
                   onClick={() => onViewChange('inventory')}
@@ -473,7 +480,7 @@ export function AddProduct({ onViewChange }: AddProductProps) {
                   <img
                     src={imagePreview}
                     alt="Vista previa"
-                    className="w-full h-48 object-cover rounded-lg border border-slate-300"
+                    className="w-full aspect-square object-cover rounded-lg border border-slate-300"
                   />
                   <button
                     type="button"

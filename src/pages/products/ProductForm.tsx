@@ -14,6 +14,8 @@ type Props = {
 };
 
 type Categoria = "Impermeabilizantes" | "Productos para Concreto" | "Pinturas" | "Selladores" | "Recubrimientos";
+type Color = "Ninguno" | "Aluminio" | "Amarilla" | "Blanco" | "Blanco Oro" | "Café" | "Gris" | "Marfil" | "Negro" | "Paja" | "Rojo" | "Rosa" | "Transparente";
+type Tipo = "Bolsa" | "Bote" | "Brocha" | "Cubeta" | "Galón" | "Juego" | "Rollo" | "Saco" | "Salchicha";
 
 type FormState = {
   idProducto: number;
@@ -23,10 +25,10 @@ type FormState = {
   stockMinimo: number;
   unidad: number;
   unidadMedida: string;
-  color: string;
+  color: Color;
   categoria: Categoria; // NO nullable aquí
   descripcion: string;
-  tipo: string;
+  tipo: Tipo;
 };
 
 export default function ProductForm({ initial = {}, onSubmit, submitLabel = "Guardar", onCancel }: Props) {
@@ -38,11 +40,11 @@ export default function ProductForm({ initial = {}, onSubmit, submitLabel = "Gua
     stockMinimo: initial.stockMinimo ?? 0,
     unidad: initial.unidad ?? 0,
     unidadMedida: (initial.unidadMedida as string) ?? "",
-    color: (initial.color as string) ?? "",
+    color: (initial.color as Color) ?? "",
     // Usa initial.categoria (no initial.tipo). Si no viene, pon un valor por defecto válido:
     categoria: (initial.categoria as Categoria) ?? "Impermeabilizantes",
     descripcion: (initial.descripcion as string) ?? "",
-    tipo: (initial.tipo as string) ?? "",
+    tipo: (initial.tipo as Tipo) ?? "",
   });
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -74,100 +76,138 @@ export default function ProductForm({ initial = {}, onSubmit, submitLabel = "Gua
   };
 
   return (
-    <form onSubmit={handleSubmit} className="grid grid-cols-2 gap-4">
-      <div className="col-span-2 space-y-2">
-        <Label>Id Producto</Label>
-        <span className="font-medium text-slate-800">{form.idProducto}</span>
-      </div>
+    <form onSubmit={handleSubmit} className="">
+      <div className="grid grid-cols-2 md:grid-cols-2 gap-4 space-y-2">
+        <div className="space-y-2">
+          <Label>Id Producto</Label>
+          <span className="font-medium text-slate-800">{form.idProducto}</span>
+        </div>
 
-      <div className="col-span-2 space-y-2">
-        <Label>Nombre</Label>
-        <Input
-          value={form.nombre}
-          onChange={e => setForm(prev => ({ ...prev, nombre: e.target.value }))}
-          required
-        />
+        <div className="space-y-2">
+          <Label>Nombre</Label>
+          <Input
+            value={form.nombre}
+            onChange={e => setForm(prev => ({ ...prev, nombre: e.target.value }))}
+            required
+          />
+        </div>
       </div>
+      <div className="grid grid-cols-4 md:grid-cols-4 gap-4 space-y-2">
+        <div className="space-y-2">
+          <Label>Categoría</Label>
+          <Select
+            value={form.categoria}
+            onValueChange={(v) => setForm(prev => ({ ...prev, categoria: v as Categoria }))}
+          >
+            <SelectTrigger className="rounded-lg border-slate-300">
+              <SelectValue placeholder="Selecciona categoría" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="Impermeabilizantes">Impermeabilizantes</SelectItem>
+              <SelectItem value="Productos para Concreto">Productos para Concreto</SelectItem>
+              <SelectItem value="Pinturas">Pinturas</SelectItem>
+              <SelectItem value="Selladores">Selladores</SelectItem>
+              <SelectItem value="Recubrimientos">Recubrimientos</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
 
-      <div className="space-y-2">
-        <Label>Categoría</Label>
-        <Select
-          value={form.categoria}
-          onValueChange={(v) => setForm(prev => ({ ...prev, categoria: v as Categoria }))}
-        >
-          <SelectTrigger className="rounded-lg border-slate-300">
-            <SelectValue placeholder="Selecciona categoría" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="Impermeabilizantes">Impermeabilizantes</SelectItem>
-            <SelectItem value="Productos para Concreto">Productos para Concreto</SelectItem>
-            <SelectItem value="Pinturas">Pinturas</SelectItem>
-            <SelectItem value="Selladores">Selladores</SelectItem>
-            <SelectItem value="Recubrimientos">Recubrimientos</SelectItem>
-          </SelectContent>
-        </Select>
+
+        <div className="space-y-2">
+          <Label>Tipo</Label>
+          <Select
+            value={form.tipo}
+            onValueChange={(v) => setForm(prev => ({ ...prev, tipo: v as Tipo }))}
+          >
+            <SelectTrigger className="rounded-lg border-slate-300">
+              <SelectValue placeholder="Selecciona categoría" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="Bolsa">Bolsa</SelectItem>
+              <SelectItem value="Bote">Bote</SelectItem>
+              <SelectItem value="Brocha">Brocha</SelectItem>
+              <SelectItem value="Cubeta">Cubeta</SelectItem>
+              <SelectItem value="Galón">Galón</SelectItem>
+              <SelectItem value="Juego">Juego</SelectItem>
+              <SelectItem value="Rollo">Rollo</SelectItem>
+              <SelectItem value="Saco">Saco</SelectItem>
+              <SelectItem value="Salchicha">Salchicha</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+
+        <div className="space-y-2">
+          <Label>Unidad</Label>
+          <Input
+            type="number"
+            value={String(form.unidad)}
+            onChange={e => setForm(prev => ({ ...prev, unidad: Number(e.target.value) || 0 }))}
+          />
+        </div>
+
+        <div className="space-y-2">
+          <Label>Unidad de Medida</Label>
+          <Input
+            value={form.unidadMedida}
+            onChange={e => setForm(prev => ({ ...prev, unidadMedida: e.target.value }))}
+          />
+        </div>
       </div>
+      <div className="grid grid-cols-4 md:grid-cols-4 gap-4 space-y-2">
+        <div className="space-y-2">
+          <Label>Color</Label>
+          <Select
+            value={form.color}
+            onValueChange={(v) => setForm(prev => ({ ...prev, color: v as Color }))}
+          >
+            <SelectTrigger className="rounded-lg border-slate-300">
+              <SelectValue placeholder="Selecciona categoría" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="Ninguno">Ninguno</SelectItem>
+              <SelectItem value="Aluminio">Aluminio</SelectItem>
+              <SelectItem value="Amarilla">Amarilla</SelectItem>
+              <SelectItem value="Blanco">Blanco</SelectItem>
+              <SelectItem value="Blanco Oro">Blanco Oro</SelectItem>
+              <SelectItem value="Café">Café</SelectItem>
+              <SelectItem value="Gris">Gris</SelectItem>
+              <SelectItem value="Marfil">Marfil</SelectItem>
+              <SelectItem value="Negro">Negro</SelectItem>
+              <SelectItem value="Negro">Paja</SelectItem>
+              <SelectItem value="Negro">Rojo</SelectItem>
+              <SelectItem value="Negro">Rosa</SelectItem>
+              <SelectItem value="Negro">Transparente</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
 
-      <div className="space-y-2">
-        <Label>Tipo</Label>
-        <Input
-          value={form.tipo}
-          onChange={e => setForm(prev => ({ ...prev, tipo: e.target.value }))}
-        />
+        <div className="space-y-2">
+          <Label>Precio Unitario</Label>
+          <Input
+            type="number"
+            value={String(form.precioUnitario)}
+            onChange={e => setForm(prev => ({ ...prev, precioUnitario: Number(e.target.value) || 0 }))}
+          />
+        </div>
+
+        <div className="space-y-2">
+          <Label>Stock</Label>
+          <Input
+            type="number"
+            value={String(form.stock)}
+            onChange={e => setForm(prev => ({ ...prev, stock: Number(e.target.value) || 0 }))}
+          />
+        </div>
+
+        <div className="space-y-2">
+          <Label>Stock Mínimo</Label>
+          <Input
+            type="number"
+            value={String(form.stockMinimo)}
+            onChange={e => setForm(prev => ({ ...prev, stockMinimo: Number(e.target.value) || 0 }))}
+          />
+        </div>
       </div>
-
-      <div className="space-y-2">
-        <Label>Unidad</Label>
-        <Input
-          type="number"
-          value={String(form.unidad)}
-          onChange={e => setForm(prev => ({ ...prev, unidad: Number(e.target.value) || 0 }))}
-        />
-      </div>
-
-      <div className="space-y-2">
-        <Label>Unidad de Medida</Label>
-        <Input
-          value={form.unidadMedida}
-          onChange={e => setForm(prev => ({ ...prev, unidadMedida: e.target.value }))}
-        />
-      </div>
-
-      <div className="space-y-2">
-        <Label>Color</Label>
-        <Input
-          value={form.color}
-          onChange={e => setForm(prev => ({ ...prev, color: e.target.value }))}
-        />
-      </div>
-
-      <div className="space-y-2">
-        <Label>Precio Unitario</Label>
-        <Input
-          type="number"
-          value={String(form.precioUnitario)}
-          onChange={e => setForm(prev => ({ ...prev, precioUnitario: Number(e.target.value) || 0 }))}
-        />
-      </div>
-
-      <div className="space-y-2">
-        <Label>Stock</Label>
-        <Input
-          type="number"
-          value={String(form.stock)}
-          onChange={e => setForm(prev => ({ ...prev, stock: Number(e.target.value) || 0 }))}
-        />
-      </div>
-
-      <div className="space-y-2">
-        <Label>Stock Mínimo</Label>
-        <Input
-          type="number"
-          value={String(form.stockMinimo)}
-          onChange={e => setForm(prev => ({ ...prev, stockMinimo: Number(e.target.value) || 0 }))}
-        />
-      </div>
-
       <div className="col-span-2 space-y-2">
         <Label>Descripción</Label>
         <Input
@@ -176,7 +216,8 @@ export default function ProductForm({ initial = {}, onSubmit, submitLabel = "Gua
         />
       </div>
 
-      <div className="col-span-2 flex justify-end gap-2">
+      <div className="col-span-2 flex justify-end gap-2 ">
+        <Button className="bg-emerald-600 hover:bg-emerald-700 text-white" type="submit">{submitLabel}</Button>
         {onCancel && (
           <Button
             variant="outline"
@@ -188,7 +229,7 @@ export default function ProductForm({ initial = {}, onSubmit, submitLabel = "Gua
             Cancelar
           </Button>
         )}
-        <Button className="bg-emerald-600 hover:bg-emerald-700 text-white" type="submit">{submitLabel}</Button>
+
       </div>
     </form>
   );
